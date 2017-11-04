@@ -1,0 +1,39 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+. "${local_path}/exceptions"
+
+functional::unroll() {
+    unpack() {
+        awk -F'|' '{for (i=1; i <= NF; ++i) {print $i;}}'
+    }
+
+    local _header
+    local _row
+
+    read _header
+
+    while read _row
+    do
+        paste -d= <(echo "${_header}" | unpack) <(echo "${_row}" | unpack) |
+        sed -e 's/"/\\"/g' -e 's/=/="/1' -e 's/\$/\\$/g' -e 's/$/";/g' |
+        tr '[\r\n]' ' '
+        echo 
+    done
+}
+
+functional::apply() {
+    local _callback="${1:?Needs a callback function}"
+    local _descriptor
+
+    mortgage::functional | while read _descriptor
+    do
+        eval "${_descriptor}"
+        "${_callback}" || logging::abort
+    done
+}
+
