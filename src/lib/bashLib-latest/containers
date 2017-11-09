@@ -1,0 +1,55 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+
+docker::invoke() {
+    sudo -A docker $@
+}
+
+docker::image() {
+    local _image="${1:?Provide a container image}"
+
+    if (docker::invoke images "${_image}" | grep -q "${_image}")
+    then
+        logging::info "Image ${_image} is present"
+        return 0
+    fi
+
+    logging::warning "Importing image ${_image}"
+    docker::invoke pull "${_image}"
+}
+
+docker::instance() {
+    local _group="${1:?Provide a group name}"
+    local _image="${2:?Provide a container image}"
+    local _instance="${3:?Provide an instance name}"
+    local _unique_name="${_group}...${_instance}"
+
+    for ((i=0; i < 2; ++i)) {
+        if docker::invoke run --name="${_unique_name}" "${_unique_name}" /bin/sleep 86400 ### FIXME: Replace with startup script ###
+        then
+            echo "${_unique_name}"
+            return
+        fi
+
+        docker::image "${_image}"
+
+        docker::invoke run \
+            --name="${_unique_name}" \
+            -it \
+            --privileged \
+            "${_image}" \
+            /bin/true ### FIXME: Replace with installer script ###
+
+        docker::invoke commit \
+            "${_unique_name}" \
+            "${_unique_name}"
+    }
+
+    logging::fatal "Couldn't create instance ${_unique_name}"
+    return 255
+}
