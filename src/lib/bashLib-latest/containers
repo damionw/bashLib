@@ -27,7 +27,8 @@ docker::instance() {
     local _group="${1:?Provide a group name}"
     local _image="${2:?Provide a container image}"
     local _instance="${3:?Provide an instance name}"
-    local _unique_name="${_group}...${_instance}"
+    local _unique_name="${_group}_${_instance}"
+    local _uuid="$(uuidgen)"
 
     for ((i=0; i < 2; ++i)) {
         if docker::invoke run --name="${_unique_name}" "${_unique_name}" /bin/sleep 86400 ### FIXME: Replace with startup script ###

@@ -1,7 +1,7 @@
 VERSION := $(shell bash -c '. src/lib/bashLib 2>/dev/null; echo $$BASHLIB_VERSION')
 INSTALL_PATH := $(shell python -c 'import sys; print sys.prefix if hasattr(sys, "real_prefix") else "/usr/local"')
 
-.PHONY: tests clean help
+.PHONY: tests clean help build
 
 all: build
 
@@ -28,7 +28,7 @@ build/share/bashLib: build/share
 build/share/bashLib/examples: build/share/bashLib
 	@rsync -az examples/ $@/
 
-build/bin/bashlibtool: build/lib/bashLib build/bin
+build/bin/bashlibtool: build/lib/bashLib build/bin | src/tools
 	@install -m 755 src/tools/bashlibtool $@
 
 build/%:
