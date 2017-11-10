@@ -23,34 +23,150 @@ docker::image() {
     docker::invoke pull "${_image}"
 }
 
-docker::instance() {
+docker::get_instance_name() {
+    local _group="${1:?Provide a group name}"
+    local _service="${2:?Provide an service name}"
+    local _instance_name="$(echo "${_group}...${_service}" | tr '[A-Z]' '[a-z]')"
+    echo "${_instance_name}"
+}
+
+docker::cleanup_instance() {
+    local _group="${1:?Provide a group name}"
+    local _service="${2:?Provide an service name}"
+    local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
+    local _container_id
+
+    docker::stop_instance "${_group}" "${_service}"
+
+    docker::invoke ps -a --filter "name=${_instance_name}" | awk '{if (NR > 1) {print $1;}}' | while read _container_id
+    do
+        logging::warning "Removing instance ${_instance_name} as ${_container_id}"
+        docker::invoke rm "${_container_id}"
+    done
+
+    docker::invoke rmi "${_instance_name}"
+}
+
+docker::stop_instance() {
+    local _group="${1:?Provide a group name}"
+    local _service="${2:?Provide an service name}"
+    local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
+    local _container_id=
+
+    docker::invoke ps --filter "name=${_instance_name}" --filter "status=running" | awk '{if (NR == 2) {print $1;}}' | while read _container_id
+    do
+        logging::warning "Stopping instance ${_instance_name} as ${_container_id}"
+        docker::invoke kill "${_container_id}"
+    done
+}
+
+docker::start_instance() {
     local _group="${1:?Provide a group name}"
     local _image="${2:?Provide a container image}"
-    local _instance="${3:?Provide an instance name}"
-    local _unique_name="${_group}_${_instance}"
-    local _uuid="$(uuidgen)"
+    local _service="${3:?Provide an service name}"
+    local _startup_folder="${4}"
 
-    for ((i=0; i < 2; ++i)) {
-        if docker::invoke run --name="${_unique_name}" "${_unique_name}" /bin/sleep 86400 ### FIXME: Replace with startup script ###
+    local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
+    local _container_id="$(docker::invoke ps --filter "name=${_instance_name}" --filter "status=running" | awk '{if (NR == 2) {print $1;}}')"
+    local _boot_folder_spec=
+    local _init_folder_spec=
+    local _other_folder_spec=
+
+    if [ -n "${_container_id}" ]
+    then
+        logging::info "${_instance_name} is already running"
+        echo "${_instance_name}"
+        return 0
+    fi
+
+    local _container_id="$(docker::invoke ps --filter "name=${_instance_name}" --filter "status=exited" | awk '{if (NR == 2) {print $1;}}')"
+
+    if [ -n "${_container_id}" ]
+    then
+        logging::warning "Restarting stopped service instance(s) ${_instance_name}"
+
+        if docker::invoke start  "${_container_id}"
         then
-            echo "${_unique_name}"
-            return
+            echo "${_instance_name}"
+            return 0
+        fi
+    fi
+
+    logging::warning "Cleaning up previous service instance(s) of ${_instance_name}"
+
+    # Cleanup all prexisting containers
+    docker::cleanup_instance "${_group}" "${_service}"
+
+    if [ -n "${_startup_folder}" ]
+    then
+        logging::info "Using contents of startup folder '${_startup_folder}'"
+
+        if [ -d "${_startup_folder}/boot" ]
+        then
+            _boot_folder_spec="--volume=${_startup_folder}/boot:/mnt/boot"
         fi
 
-        docker::image "${_image}"
+        if [ -d "${_startup_folder}/install" ]
+        then
+            _init_folder_spec="--volume=${_startup_folder}/boot:/mnt/install"
+        fi
+    fi
+
+    for ((i=0; i < 2; ++i)) {
+        # Try and 'boot' from a prepared image
+#            -it \
+#            --detach \
 
         docker::invoke run \
-            --name="${_unique_name}" \
-            -it \
+            --name="${_instance_name}" \
             --privileged \
-            "${_image}" \
-            /bin/true ### FIXME: Replace with installer script ###
+            ${_boot_folder_spec} \
+            ${_other_folder_spec} \
+            "${_instance_name}" \
+            /bin/bash -cx 'sleep 86400' # ; /mnt/boot/run || true; /bin/sleep 86400'" #              >/dev/null
 
+        if [ $? = 0 ]
+        then
+            logging::info "Started instance '${_instance_name}'"
+            echo "${_instance_name}"
+            return 0
+        fi
+
+        logging::warning "Configuring new image for instance '${_instance_name}'"
+
+        # No image exists, so 'install' from the base image
+        docker::image "${_image}"
+
+        local _uuid="$(uuidgen)" # Temporary name for the image build container
+
+        # Create a new container and initialize/install components and wait while it runs
+        docker::invoke run \
+            --name="${_uuid}" \
+            --privileged \
+            ${_init_folder_spec} \
+            ${_other_folder_spec} \
+            "${_image}" \
+            /bin/sh -c '/mnt/install/run 2>/dev/null || true'
+
+        # Commit our new image
         docker::invoke commit \
-            "${_unique_name}" \
-            "${_unique_name}"
+            "${_uuid}" \
+            "${_instance_name}"
+
+        docker::invoke rm "${_uuid}"
     }
 
-    logging::fatal "Couldn't create instance ${_unique_name}"
+    logging::warning "Couldn't create or start ${_instance_name}"
     return 255
+}
+
+docker::rebuild_instance() {
+    local _group="${1:?Provide a group name}"
+    local _image="${2:?Provide a container image}"
+    local _service="${3:?Provide an service name}"
+    local _startup_folder="${4}"
+
+    docker::stop_instance "${_group}" "${_service}"
+    docker::cleanup_instance "${_group}" "${_service}"
+    docker::start_instance "${_group}" "${_image}" "${_service}"
 }
