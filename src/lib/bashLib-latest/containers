@@ -7,19 +7,25 @@ local_path="$(dirname "${actual_name}")"
 . "${local_path}/logging"
 
 docker::invoke() {
-    sudo -A docker $@
+    sudo -A docker "$@"
 }
 
 docker::image() {
-    local _image="${1:?Provide a container image}"
+    local _image="${1:?Provide a container image}" ### <image>[:<tag>] ###
+    local _tag
 
-    if (docker::invoke images "${_image}" | grep -q "${_image}")
+    read _image _tag <<< "$(echo "${_image}" | sed -e 's/[\:]/ /1')"
+
+    local _matches="$(docker::invoke images "${_image}" | awk '{if ($2 == tag) {print $0;}}' tag="${_tag}" | wc -l)"
+
+    if [ ${_matches} -gt 0 ]
     then
         logging::info "Image ${_image} is present"
         return 0
     fi
 
     logging::warning "Importing image ${_image}"
+    exit 255 ### DEBUG ###
     docker::invoke pull "${_image}"
 }
 
@@ -114,16 +120,15 @@ docker::start_instance() {
 
     for ((i=0; i < 2; ++i)) {
         # Try and 'boot' from a prepared image
-#            -it \
-#            --detach \
 
         docker::invoke run \
             --name="${_instance_name}" \
             --privileged \
+            --detach \
             ${_boot_folder_spec} \
             ${_other_folder_spec} \
             "${_instance_name}" \
-            /bin/bash -cx 'sleep 86400' # ; /mnt/boot/run || true; /bin/sleep 86400'" #              >/dev/null
+            /bin/bash -cx "/mnt/boot/run; exec sleep 86400"
 
         if [ $? = 0 ]
         then
@@ -146,7 +151,7 @@ docker::start_instance() {
             ${_init_folder_spec} \
             ${_other_folder_spec} \
             "${_image}" \
-            /bin/sh -c '/mnt/install/run 2>/dev/null || true'
+            /bin/sh -c '/mnt/install/run || true'
 
         # Commit our new image
         docker::invoke commit \
