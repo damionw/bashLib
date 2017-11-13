@@ -67,16 +67,22 @@ docker::stop_instance() {
 }
 
 docker::start_instance() {
+    # Usage: <group name> <base image> <service instance name> <initialization folder>
+
     local _group="${1:?Provide a group name}"
     local _image="${2:?Provide a container image}"
     local _service="${3:?Provide an service name}"
     local _startup_folder="${4}"
 
     local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
-    local _container_id="$(docker::invoke ps --filter "name=${_instance_name}" --filter "status=running" | awk '{if (NR == 2) {print $1;}}')"
     local _boot_folder_spec=
     local _init_folder_spec=
     local _other_folder_spec=
+
+    #------------------------------------
+    # Detect running instance
+    #------------------------------------
+    local _container_id="$(docker::invoke ps --filter "name=${_instance_name}" --filter "status=running" | awk '{if (NR == 2) {print $1;}}')"
 
     if [ -n "${_container_id}" ]
     then
@@ -85,19 +91,25 @@ docker::start_instance() {
         return 0
     fi
 
+    #------------------------------------
+    # (re)start stopped instance
+    #------------------------------------
     local _container_id="$(docker::invoke ps --filter "name=${_instance_name}" --filter "status=exited" | awk '{if (NR == 2) {print $1;}}')"
 
     if [ -n "${_container_id}" ]
     then
         logging::warning "Restarting stopped service instance(s) ${_instance_name}"
 
-        if docker::invoke start  "${_container_id}"
+        if docker::invoke start "${_container_id}"
         then
             echo "${_instance_name}"
             return 0
         fi
     fi
 
+    #------------------------------------
+    # Create new instance from base image
+    #------------------------------------
     logging::warning "Cleaning up previous service instance(s) of ${_instance_name}"
 
     # Cleanup all prexisting containers
@@ -174,4 +186,8 @@ docker::rebuild_instance() {
     docker::stop_instance "${_group}" "${_service}"
     docker::cleanup_instance "${_group}" "${_service}"
     docker::start_instance "${_group}" "${_image}" "${_service}"
+}
+
+docker::start_group() {
+    :
 }
