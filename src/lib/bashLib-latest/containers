@@ -67,17 +67,15 @@ docker::stop_instance() {
 }
 
 docker::start_instance() {
-    # Usage: <group name> <base image> <service instance name> <initialization folder>
+    # arguments: <group name> <base image> <service instance name> [<startup_script> [<installation_script>]]
 
     local _group="${1:?Provide a group name}"
     local _image="${2:?Provide a container image}"
     local _service="${3:?Provide an service name}"
-    local _startup_folder="${4}"
+    local _startup_script="${4}"
+    local _install_script="${5}"
 
     local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
-    local _boot_folder_spec=
-    local _init_folder_spec=
-    local _other_folder_spec=
 
     #------------------------------------
     # Detect running instance
@@ -115,20 +113,21 @@ docker::start_instance() {
     # Cleanup all prexisting containers
     docker::cleanup_instance "${_group}" "${_service}"
 
-    if [ -n "${_startup_folder}" ]
+    local _temp_folder="$(mktemp -d)"
+
+    (echo "#! /usr/bin/env bash"; echo true) | tee "${_temp_folder}/startup" | tee "${_temp_folder}/startup" >/dev/null
+
+    if [ -n "${_startup_script}" -a -e "${_startup_script}" ]
     then
-        logging::info "Using contents of startup folder '${_startup_folder}'"
-
-        if [ -d "${_startup_folder}/boot" ]
-        then
-            _boot_folder_spec="--volume=${_startup_folder}/boot:/mnt/boot"
-        fi
-
-        if [ -d "${_startup_folder}/install" ]
-        then
-            _init_folder_spec="--volume=${_startup_folder}/boot:/mnt/install"
-        fi
+        cp "${_startup_script}" "${_temp_folder}/startup"
     fi
+
+    if [ -n "${_install_script}" -a -e "${_install_script}" ]
+    then
+        cp "${_install_script}" "${_temp_folder}/install"
+    fi
+
+    chmod 755 "${_temp_folder}/install" "${_temp_folder}/startup"
 
     for ((i=0; i < 2; ++i)) {
         # Try and 'boot' from a prepared image
@@ -137,10 +136,11 @@ docker::start_instance() {
             --name="${_instance_name}" \
             --privileged \
             --detach \
+            --volume="${_temp_folder}/boot:/mnt/boot" \
             ${_boot_folder_spec} \
             ${_other_folder_spec} \
             "${_instance_name}" \
-            /bin/bash -cx "/mnt/boot/run; exec sleep 86400"
+            /bin/bash -cx "/mnt/boot/startup && exec sleep 86400"
 
         if [ $? = 0 ]
         then
@@ -160,10 +160,9 @@ docker::start_instance() {
         docker::invoke run \
             --name="${_uuid}" \
             --privileged \
-            ${_init_folder_spec} \
-            ${_other_folder_spec} \
+            --volume="${_temp_folder}/boot:/mnt/boot" \
             "${_image}" \
-            /bin/sh -c '/mnt/install/run || true'
+            /bin/sh -c '/mnt/boot/install || true'
 
         # Commit our new image
         docker::invoke commit \
@@ -178,16 +177,70 @@ docker::start_instance() {
 }
 
 docker::rebuild_instance() {
+    # arguments: <group name> <base image> <service instance name> [<startup_script> [<install_script>]]
+
     local _group="${1:?Provide a group name}"
     local _image="${2:?Provide a container image}"
     local _service="${3:?Provide an service name}"
-    local _startup_folder="${4}"
+    local _startup_script="${4}"
+    local _init_script="${5}"
 
     docker::stop_instance "${_group}" "${_service}"
     docker::cleanup_instance "${_group}" "${_service}"
-    docker::start_instance "${_group}" "${_image}" "${_service}"
+    docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_script}" "${_init_script}"
 }
 
 docker::start_group() {
-    :
+    # arguments: <json string>
+    #
+    # e.g.
+    # {
+    #     "groups": [
+    #         {
+    #             "group": <name>,
+    #             "service": <name>,
+    #             "image": <base image>,
+    #             "install": <script string>,
+    #             "startup": <script string>
+    #         }
+    #     ]
+    # }
+
+    local _group_definition="${1:?Need JSON suite definition}"
+    local _row
+
+    local _flattened="$(
+        echo "${_group_definition}" | jq -r '
+            .["groups"][] | (
+                .["group"] + "|||" +
+                .["image"] + "|||" +
+                .["service"] + "|||" +
+                .["startup"] + "|||" +
+                .["install"]
+            )
+        '
+    )"
+
+    while IFS="|||" read -ra _row
+    do
+        local _group="${_row[0]}"
+        local _image="${_row[1]}"
+        local _service="${_row[2]}"
+        local _startup="${_row[3]}"
+        local _install="${_row[4]}"
+
+        if [ -n "${_startup}" ]
+        then
+            local _startup_path="$(mktemp)"
+            echo "${_startup}" > "${_startup_path}"
+        fi
+
+        if [ -n "${_install}" ]
+        then
+            local _install_path="$(mktemp)"
+            echo "${_install}" > "${_install_path}"
+        fi
+
+        echo docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_path}" "${_install_path}"
+    done <<< "${_flattened}"
 }
