@@ -1,0 +1,36 @@
+#! /usr/bin/env bash
+
+. $(bashlibtool --lib)
+
+group_definition() {
+    sed -e 's/^        //g' <<'    EOF' | m4 -DGROUP="TestGroup" -DIMAGE="ubuntu"
+    {
+            "groups": {
+                "name": "GROUP",
+
+                "services": [
+                    {
+                        "name": "One",
+                        "image": "IMAGE",
+                        "install": "",
+                        "startup": ""
+                    },
+                    {
+                        "name": "Two",
+                        "image": "IMAGE",
+                        "install": "",
+                        "startup": ""
+                    }
+                ]
+            }
+        }
+    EOF
+}
+
+group_definition | jq -r '
+.["groups"] | keys
+'
+
+exit
+docker::start_group "$(group_definition)"
+

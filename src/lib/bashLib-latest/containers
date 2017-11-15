@@ -195,15 +195,18 @@ docker::start_group() {
     #
     # e.g.
     # {
-    #     "groups": [
-    #         {
-    #             "group": <name>,
-    #             "service": <name>,
-    #             "image": <base image>,
-    #             "install": <script string>,
-    #             "startup": <script string>
-    #         }
-    #     ]
+    #     "groups": {
+    #         "name": <name>,
+    #
+    #         "services": [
+    #             {
+    #                 "name": <name>,
+    #                 "image": <base image>,
+    #                 "install": <script string>,
+    #                 "startup": <script string>
+    #             }
+    #         ]
+    #     }
     # }
 
     local _group_definition="${1:?Need JSON suite definition}"
