@@ -12,3 +12,7 @@ lib_path="${local_path}/bashLib-${BASHLIB_VERSION}"
 . "${lib_path}/exceptions"
 . "${lib_path}/containers"
 . "${lib_path}/environments"
+
+bashlib::version() {
+    echo "${BASHLIB_VERSION}"
+}

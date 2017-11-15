@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+. $(bashlibtool --lib)
+
+bashlib::version
