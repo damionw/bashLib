@@ -196,11 +196,9 @@ docker::start_group() {
     # e.g.
     # {
     #     "groups": {
-    #         "name": <name>,
-    #
-    #         "services": [
+    #         <group name> : [
     #             {
-    #                 "name": <name>,
+    #                 "name": <service name>,
     #                 "image": <base image>,
     #                 "install": <script string>,
     #                 "startup": <script string>
@@ -214,23 +212,29 @@ docker::start_group() {
 
     local _flattened="$(
         echo "${_group_definition}" | jq -r '
-            .["groups"][] | (
-                .["group"] + "|||" +
-                .["image"] + "|||" +
-                .["service"] + "|||" +
-                .["startup"] + "|||" +
-                .["install"]
-            )
+            .["groups"] |
+            . as $in | keys[] |
+            . as $group |
+            $in[.][] |
+            $group + "|||" +
+            .["image"] + "|||" +
+            .["name"] + "|||" +
+            .["startup"] + "|||" +
+            .["install"]
         '
     )"
 
-    while IFS="|||" read -ra _row
+    split() {
+        awk -F"[|][|][|]" '{print $pos}' pos=${1:-1}
+    }
+
+    while read _row
     do
-        local _group="${_row[0]}"
-        local _image="${_row[1]}"
-        local _service="${_row[2]}"
-        local _startup="${_row[3]}"
-        local _install="${_row[4]}"
+        local _group="$(split 1 <<< "${_row}")"
+        local _image="$(split 2 <<< "${_row}")"
+        local _service="$(split 3 <<< "${_row}")"
+        local _startup="$(split 4 <<< "${_row}")"
+        local _install="$(split 5 <<< "${_row}")"
 
         if [ -n "${_startup}" ]
         then
@@ -244,6 +248,6 @@ docker::start_group() {
             echo "${_install}" > "${_install_path}"
         fi
 
-        echo docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_path}" "${_install_path}"
+        docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_path}" "${_install_path}"
     done <<< "${_flattened}"
 }

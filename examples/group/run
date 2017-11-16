@@ -3,12 +3,10 @@
 . $(bashlibtool --lib)
 
 group_definition() {
-    sed -e 's/^        //g' <<'    EOF' | m4 -DGROUP="TestGroup" -DIMAGE="ubuntu"
+    sed -e 's/^        //g' <<'    EOF' | m4 -DGROUP_NAME="TestGroup" -DIMAGE="ubuntu"
     {
             "groups": {
-                "name": "GROUP",
-
-                "services": [
+                "GROUP_NAME": [
                     {
                         "name": "One",
                         "image": "IMAGE",
@@ -27,10 +25,5 @@ group_definition() {
     EOF
 }
 
-group_definition | jq -r '
-.["groups"] | keys
-'
-
-exit
 docker::start_group "$(group_definition)"
 
