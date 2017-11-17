@@ -16,7 +16,7 @@ docker::image() {
 
     read _image _tag <<< "$(echo "${_image}" | sed -e 's/[\:]/ /1')"
 
-    local _matches="$(docker::invoke images "${_image}" | awk '{if ($2 == tag) {print $0;}}' tag="${_tag}" | wc -l)"
+    local _matches="$(docker::invoke images "${_image}" | awk '{if ($2 == tag) {print $0;}}' tag="${_tag:-latest}" | wc -l)"
 
     if [ ${_matches} -gt 0 ]
     then
@@ -25,7 +25,7 @@ docker::image() {
     fi
 
     logging::warning "Importing image ${_image}"
-    exit 255 ### DEBUG ###
+
     docker::invoke pull "${_image}"
 }
 
@@ -115,7 +115,7 @@ docker::start_instance() {
 
     local _temp_folder="$(mktemp -d)"
 
-    (echo "#! /usr/bin/env bash"; echo true) | tee "${_temp_folder}/startup" | tee "${_temp_folder}/startup" >/dev/null
+    (echo "#! /usr/bin/env bash"; echo true) | tee "${_temp_folder}/startup" | tee "${_temp_folder}/install" >/dev/null
 
     if [ -n "${_startup_script}" -a -e "${_startup_script}" ]
     then
@@ -137,8 +137,6 @@ docker::start_instance() {
             --privileged \
             --detach \
             --volume="${_temp_folder}/boot:/mnt/boot" \
-            ${_boot_folder_spec} \
-            ${_other_folder_spec} \
             "${_instance_name}" \
             /bin/bash -cx "/mnt/boot/startup && exec sleep 86400"
 
