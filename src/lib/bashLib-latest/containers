@@ -136,7 +136,7 @@ docker::start_instance() {
             --name="${_instance_name}" \
             --privileged \
             --detach \
-            --volume="${_temp_folder}/boot:/mnt/boot" \
+            --volume="${_temp_folder}:/mnt/boot" \
             "${_instance_name}" \
             /bin/bash -cx "/mnt/boot/startup && exec sleep 86400"
 
@@ -158,9 +158,11 @@ docker::start_instance() {
         docker::invoke run \
             --name="${_uuid}" \
             --privileged \
-            --volume="${_temp_folder}/boot:/mnt/boot" \
+            --volume="${_temp_folder}:/mnt/boot" \
             "${_image}" \
-            /bin/sh -c '/mnt/boot/install || true'
+            /bin/sh -c '/mnt/boot/install'
+
+        logging::warning "Install status = $?"
 
         # Commit our new image
         docker::invoke commit \
@@ -188,6 +190,24 @@ docker::rebuild_instance() {
     docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_script}" "${_init_script}"
 }
 
+docker::_formatting::group_members() {
+    jq -r '
+        .["groups"] |
+        . as $in | keys[] |
+        . as $group |
+        $in[.][] |
+        $group + "|||" +
+        .["image"] + "|||" +
+        .["name"] + "|||" +
+        .["startup"] + "|||" +
+        .["install"]
+    '
+}
+
+docker::_formatting::splitter() {
+    awk -F"[|][|][|]" '{print $pos}' pos=${1:-1}
+}
+
 docker::start_group() {
     # arguments: <json string>
     #
@@ -207,32 +227,15 @@ docker::start_group() {
 
     local _group_definition="${1:?Need JSON suite definition}"
     local _row
-
-    local _flattened="$(
-        echo "${_group_definition}" | jq -r '
-            .["groups"] |
-            . as $in | keys[] |
-            . as $group |
-            $in[.][] |
-            $group + "|||" +
-            .["image"] + "|||" +
-            .["name"] + "|||" +
-            .["startup"] + "|||" +
-            .["install"]
-        '
-    )"
-
-    split() {
-        awk -F"[|][|][|]" '{print $pos}' pos=${1:-1}
-    }
+    local _flattened="$(echo "${_group_definition}" | docker::_formatting::group_members)"
 
     while read _row
     do
-        local _group="$(split 1 <<< "${_row}")"
-        local _image="$(split 2 <<< "${_row}")"
-        local _service="$(split 3 <<< "${_row}")"
-        local _startup="$(split 4 <<< "${_row}")"
-        local _install="$(split 5 <<< "${_row}")"
+        local _group="$(docker::_formatting::splitter 1 <<< "${_row}")"
+        local _image="$(docker::_formatting::splitter 2 <<< "${_row}")"
+        local _service="$(docker::_formatting::splitter 3 <<< "${_row}")"
+        local _startup="$(docker::_formatting::splitter 4 <<< "${_row}")"
+        local _install="$(docker::_formatting::splitter 5 <<< "${_row}")"
 
         if [ -n "${_startup}" ]
         then
@@ -248,4 +251,39 @@ docker::start_group() {
 
         docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_path}" "${_install_path}"
     done <<< "${_flattened}"
+}
+
+docker::stop_group() {
+    local _group_definition="${1:?Need JSON suite definition}"
+    local _flattened="$(echo "${_group_definition}" | docker::_formatting::group_members)"
+    local _row
+
+    while read _row
+    do
+        local _group="$(docker::_formatting::splitter 1 <<< "${_row}")"
+        local _service="$(docker::_formatting::splitter 3 <<< "${_row}")"
+
+        docker::stop_instance "${_group}" "${_service}"
+    done <<< "${_flattened}"
+}
+
+docker::cleanup_group() {
+    local _group_definition="${1:?Need JSON suite definition}"
+    local _flattened="$(echo "${_group_definition}" | docker::_formatting::group_members)"
+    local _row
+
+    while read _row
+    do
+        local _group="$(docker::_formatting::splitter 1 <<< "${_row}")"
+        local _service="$(docker::_formatting::splitter 3 <<< "${_row}")"
+
+        docker::cleanup_instance "${_group}" "${_service}"
+    done <<< "${_flattened}"
+}
+
+docker::rebuild_group() {
+    local _group_definition="${1:?Need JSON suite definition}"
+
+    docker::cleanup_group "${_group_definition}"
+    docker::start_group "${_group_definition}"
 }
