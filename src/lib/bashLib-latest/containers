@@ -74,6 +74,7 @@ docker::start_instance() {
     local _service="${3:?Provide an service name}"
     local _startup_script="${4}"
     local _install_script="${5}"
+    local _privileged= # --privileged
 
     local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
 
@@ -134,7 +135,7 @@ docker::start_instance() {
 
         docker::invoke run \
             --name="${_instance_name}" \
-            --privileged \
+            ${_privileged} \
             --detach \
             --volume="${_temp_folder}:/mnt/boot" \
             "${_instance_name}" \
@@ -157,7 +158,7 @@ docker::start_instance() {
         # Create a new container and initialize/install components and wait while it runs
         docker::invoke run \
             --name="${_uuid}" \
-            --privileged \
+            ${_privileged} \
             --volume="${_temp_folder}:/mnt/boot" \
             "${_image}" \
             /bin/sh -c '/mnt/boot/install'

@@ -3,19 +3,19 @@
 . $(bashlibtool --lib)
 
 group_definition() {
-    sed -e 's/^        //g' <<'    EOF' | m4 -DGROUP_NAME="TestGroup" -DIMAGE="ubuntu"
+    sed -e 's/^        //g' <<'    EOF'
     {
             "groups": {
-                "GROUP_NAME": [
+                "TestGroup": [
                     {
                         "name": "One",
-                        "image": "IMAGE",
+                        "image": "ubuntu:12.04",
                         "install": "",
                         "startup": ""
                     },
                     {
                         "name": "Two",
-                        "image": "IMAGE",
+                        "image": "ubuntu:12.04",
                         "install": "",
                         "startup": ""
                     }
@@ -25,5 +25,5 @@ group_definition() {
     EOF
 }
 
-docker::start_group "$(group_definition)"
+docker::rebuild_group "$(group_definition)"
 
