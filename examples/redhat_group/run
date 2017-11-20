@@ -1,0 +1,23 @@
+#! /usr/bin/env bash
+
+. $(bashlibtool --lib)
+
+group_definition() {
+    sed -e 's/^        //g' <<'    EOF'
+    {
+            "groups": {
+                "RHEL_Testing": [
+                    {
+                        "name": "Redhat",
+                        "image": "registry.access.redhat.com/rhel7/rhel",
+                        "install": "",
+                        "startup": ""
+                    }
+                ]
+            }
+        }
+    EOF
+}
+
+docker::rebuild_group "$(group_definition)"
+
