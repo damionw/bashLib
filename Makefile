@@ -20,7 +20,7 @@ build/lib/bashLib: build/lib/bashLib-$(VERSION) build/lib
 	@install -m 755 src/lib/bashLib $@
 
 build/lib/bashLib-$(VERSION): build/lib
-	@rsync -az src/lib/bashLib-latest/ $@/
+	@rsync -az src/lib/bashLib-$(VERSION)/ $@/
 
 build/share/bashLib: build/share
 	@mkdir $@
