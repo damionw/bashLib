@@ -1,0 +1,29 @@
+#! /usr/bin/env bash
+
+. $(bashlibtool --lib)
+
+group_definition() {
+    sed -e 's/^        //g' <<'    EOF'
+    {
+            "groups": {
+                "TestGroup": [
+                    {
+                        "name": "One",
+                        "image": "ubuntu:12.04",
+                        "install": "",
+                        "startup": ""
+                    },
+                    {
+                        "name": "Two",
+                        "image": "ubuntu:12.04",
+                        "install": "",
+                        "startup": ""
+                    }
+                ]
+            }
+        }
+    EOF
+}
+
+docker::rebuild_group "$(group_definition)"
+

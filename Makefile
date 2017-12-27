@@ -1,7 +1,8 @@
 VERSION := $(shell bash -c '. src/lib/bashLib 2>/dev/null; echo $$BASHLIB_VERSION')
 INSTALL_PATH := $(shell python -c 'import sys; print sys.prefix if hasattr(sys, "real_prefix") else "/usr/local"')
+LIB_COMPONENTS := $(wildcard src/lib/bashLib-$(VERSION)/*)
 
-.PHONY: tests clean help
+.PHONY: tests clean help build
 
 all: build
 
@@ -10,16 +11,22 @@ help:
 
 build: build/lib/bashLib build/bin/bashlibtool
 
+tests: build
+	@PATH="$(shell readlink -f build/bin):$(PATH)" unittests/testsuite
+
+examples/%: build
+	@cd $@ && PATH="$(shell readlink -f build/bin):$(PATH)" ./run
+
 install: tests
 	@rsync -az build/ $(INSTALL_PATH)/
 
 version: all
 	@build/bin/bashlibtool --version
 
-build/lib/bashLib: build/lib/bashLib-$(VERSION) build/lib
+build/lib/bashLib: build/lib/bashLib-$(VERSION) build/lib src/lib/bashLib
 	@install -m 755 src/lib/bashLib $@
 
-build/lib/bashLib-$(VERSION): build/lib
+build/lib/bashLib-$(VERSION): build/lib $(LIB_COMPONENTS)
 	@rsync -az src/lib/bashLib-$(VERSION)/ $@/
 
 build/share/bashLib: build/share
@@ -28,14 +35,11 @@ build/share/bashLib: build/share
 build/share/bashLib/examples: build/share/bashLib
 	@rsync -az examples/ $@/
 
-build/bin/bashlibtool: build/lib/bashLib build/bin
+build/bin/bashlibtool: build/lib/bashLib build/bin | src/tools
 	@install -m 755 src/tools/bashlibtool $@
 
 build/%:
 	@install -d $@
-
-tests: build
-	@PATH="$(shell readlink -f build/bin):$(PATH)" unittests/testsuite
 
 clean:
 	-@rm -rf build checkouts

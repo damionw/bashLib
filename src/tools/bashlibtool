@@ -34,7 +34,7 @@ showhelp()
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,fatal,env,lib"
+long_options="help,version,debug,info,warning,fatal,env::,lib,virtualenv::"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -57,6 +57,21 @@ do
         --debug|--info|--warning|--fatal)
             logging::set_severity "$(echo "${1}" | sed -e 's/^[\-]*//g')"
             shift
+            ;;
+
+        --env|--virtualenv)
+            shift 2
+
+            if [ "${2}" = "" ]
+            then
+                environments::virtualenv_path
+                exit 0
+            fi
+
+            if ! . "${2}/bin/activate"
+            then
+                logging::fatal "Cannot select virtual environment in '${2}'"
+            fi
             ;;
 
         --lib)

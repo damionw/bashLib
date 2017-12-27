@@ -17,3 +17,8 @@ lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 . "${lib_path}/logging"
 . "${lib_path}/functional"
 . "${lib_path}/exceptions"
+. "${lib_path}/containers"
+
+bashlib::version() {
+    echo "${BASHLIB_VERSION}"
+}
