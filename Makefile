@@ -24,7 +24,7 @@ install: tests
 version: all
 	@build/bin/bashlibtool --version
 
-build/lib/bashLib: build/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION) build/lib src/lib/$(PACKAGE_NAME)
+build/lib/$(PACKAGE_NAME): build/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION) build/lib src/lib/$(PACKAGE_NAME)
 	@install -m 755 src/lib/$(PACKAGE_NAME) $@
 
 build/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION): build/lib $(LIB_COMPONENTS)
