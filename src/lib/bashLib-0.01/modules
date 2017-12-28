@@ -23,7 +23,7 @@ modules::install::git() {
             logging::error "Couldn't install package from '${_url}'"
             _result=false
         else
-            logging::info "Successfully installed package '${_url}'"
+            logging::info "Successfully installed branch '${_branch}' from package '${_url}'"
         fi
 
         rm -rf "${_tempdir}"
