@@ -34,7 +34,7 @@ showhelp()
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,fatal,env::,lib,virtualenv::"
+long_options="help,version,debug,info,warning,fatal,env:,install:"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -59,30 +59,39 @@ do
             shift
             ;;
 
-        --env|--virtualenv)
-            shift 2
+        --env)
+            virtualenv::create "${2}"
 
-            if [ "${2}" = "" ]
+            if . "${2}/bin/activate"
             then
-                environments::virtualenv_path
-                exit 0
-            fi
-
-            if ! . "${2}/bin/activate"
-            then
+                logging::warning "Selected virtual environment in '$(virtualenv::path)'"
+            else
                 logging::fatal "Cannot select virtual environment in '${2}'"
             fi
+
+            shift 2
             ;;
 
-        --lib)
-            echo "${library_import_file}"
-            shift
-            exit 0
-            ;;
+        --install)
+            logging::warning "Installing module '${2}' in '$(virtualenv::path)'"
 
-        --version)
-            echo "${BASHLIB_VERSION}"
-            exit 0
+            if tempdir="$(mktemp --directory --quiet)"
+            then
+                if ! git clone "${2}" "${tempdir}" --branch=master
+                then
+                    logging::error "Failed to extract from repo '${2}'"
+                elif ! cd "${tempdir}"
+                then
+                    logging::error "Couldn't select path '${tempdir}'"
+                elif ! make install
+                then
+                    logging::error "Couldn't install package"
+                fi
+
+                rm -rf "${tempdir}"
+            fi
+
+            shift 2
             ;;
 
         --)
@@ -93,18 +102,6 @@ do
         *)
             showhelp "${long_options}" >&2
             exit 0
-            ;;
-    esac
-done
-
-#===================================================================================
-#                                Handle requests
-#===================================================================================
-for command in $@
-do
-    case "${command}" in
-        *)
-            logging::fatal "Unknown command ${command}"
             ;;
     esac
 done
