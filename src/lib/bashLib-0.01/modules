@@ -8,20 +8,26 @@ local_path="$(dirname "${actual_name}")"
 
 modules::install::git() {
     local _url="${1?Need to provide a GIT url}"
+    local _branch="${2:-master}"
     local _tempdir
+    local _result=true
 
     if _tempdir="$(mktemp --directory --quiet)"
     then
-        if ! git clone "${_url}" "${_tempdir}" --branch=master
+        if ! git clone "${_url}" "${_tempdir}" --branch="${_branch}"
         then
             logging::error "Failed to extract from repo '${_url}'"
+            _result=false
         elif ! (cd "${_tempdir}" && make install)
         then
             logging::error "Couldn't install package from '${_url}'"
+            _result=false
         else
             logging::info "Successfully installed package '${_url}'"
         fi
 
         rm -rf "${_tempdir}"
     fi
+
+    "${_result}"
 }
