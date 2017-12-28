@@ -34,7 +34,7 @@ showhelp()
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,fatal,env:,install:"
+long_options="help,version,debug,info,warning,fatal,env:,install:,git:"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -72,25 +72,9 @@ do
             shift 2
             ;;
 
-        --install)
+        --install|--git)
             logging::warning "Installing module '${2}' in '$(virtualenv::path)'"
-
-            if tempdir="$(mktemp --directory --quiet)"
-            then
-                if ! git clone "${2}" "${tempdir}" --branch=master
-                then
-                    logging::error "Failed to extract from repo '${2}'"
-                elif ! cd "${tempdir}"
-                then
-                    logging::error "Couldn't select path '${tempdir}'"
-                elif ! make install
-                then
-                    logging::error "Couldn't install package"
-                fi
-
-                rm -rf "${tempdir}"
-            fi
-
+            modules::install::git "${2}"
             shift 2
             ;;
 
