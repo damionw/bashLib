@@ -34,7 +34,7 @@ showhelp()
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,fatal,lib"
+long_options="help,version,debug,info,warning,fatal,lib,env"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -67,6 +67,12 @@ do
 
         --version)
             bashlib::version
+            shift
+            exit 0
+            ;;
+
+        --env)
+            virtualenv::path
             shift
             exit 0
             ;;
