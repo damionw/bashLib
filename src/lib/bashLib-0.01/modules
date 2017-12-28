@@ -21,6 +21,8 @@ modules::install::git() {
         elif ! make install
         then
             logging::error "Couldn't install package from '${_url}'"
+        else
+            logging::info "Successfully installed package '${_url}'"
         fi
 
         rm -rf "${_tempdir}"
