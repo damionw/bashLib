@@ -19,6 +19,7 @@ logging::get_levels() {
     ordered_severities() {
         sed -e 's/^[ ]*//g' -e '/^$/d' <<"        EOF"
             fatal
+            error
             warning
             info
             debug
@@ -49,6 +50,10 @@ logging::format() {
 logging::fatal() {
     logging::format fatal $@
     exit 255
+}
+
+logging::error() {
+    logging::format error $@
 }
 
 logging::warning() {
