@@ -15,10 +15,7 @@ modules::install::git() {
         if ! git clone "${_url}" "${_tempdir}" --branch=master
         then
             logging::error "Failed to extract from repo '${_url}'"
-        elif ! cd "${_tempdir}"
-        then
-            logging::error "Couldn't select path '${_tempdir}'"
-        elif ! make install
+        elif ! (cd "${_tempdir}" && make install)
         then
             logging::error "Couldn't install package from '${_url}'"
         else
