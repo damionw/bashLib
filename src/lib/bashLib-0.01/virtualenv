@@ -6,6 +6,6 @@ local_path="$(dirname "${actual_name}")"
 
 . "${local_path}/logging"
 
-environments::virtualenv_path() {
+virtualenv::virtualenv_path() {
     python -c 'import sys; print "" if not hasattr(sys, "real_prefix") else sys.prefix'
 }
