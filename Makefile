@@ -21,6 +21,7 @@ examples/%: build
 	@cd $@ && PATH="$(shell readlink -f build/bin):$(PATH)" ./run
 
 install: tests
+	@echo "Installing into directory '$(INSTALL_PATH)'"
 	@rsync -az build/ $(INSTALL_PATH)/
 
 version: all
