@@ -16,6 +16,9 @@ tabular::separator() {
 # named _column_<name> containing that column's contents, inside the function
 # as it is executed per row
 #
+# Example:
+#       (echo One; echo 1; echo 2) | tabular::apply 'echo ${_column_one}'
+#
 # Params:
 #        function_name or shell command string
 #        column separator (defaults to tabular::separator())
