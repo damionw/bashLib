@@ -1,0 +1,75 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+
+tabular::separator() {
+    echo "|||"
+}
+
+#==========================================================================
+# Apply a named function or command string  over a column headed, tabular
+# input stream. The column headers will be used to create shell variables
+# named _column_<name> containing that column's contents, inside the function
+# as it is executed per row
+#
+# Params:
+#        function_name or shell command string
+#        column separator (defaults to tabular::separator())
+#==========================================================================
+tabular::apply() {
+    local _fn="${1:?Provide a function name}"
+    local _regex="$(echo "${2:-$(tabular::separator)}" | sed -e 's/./\[\\&\]/g')"
+    local _prefix="_column_"
+    local _columns
+    local _row
+    local _myfunction
+
+    shift
+
+    if ! declare -F "${_fn}" >/dev/null 2>&1
+    then
+        eval "_myfunction() { "${_fn}"; }" && _fn=_myfunction
+    fi
+
+    if read _columns
+    then
+        local _meta_columns="$(
+            echo "${_columns}" |
+            tr '[A-Z]' '[a-z]' |
+            sed -e 's/'"${_regex}"'/\n/g' |
+            sed -e '/^[ ]*$/d' |
+            sed -e 's/[ ][ ]*/_/g' -e 's/[\W]*//g'
+        )"
+
+        local _remapper="$(
+            echo "${_meta_columns}" | {
+                _pos_regex='^'
+                _nl=
+
+                while read _column
+                do
+                    echo "s/${_pos_regex}/${_nl}${_column}=/1"
+                    _pos_regex="${_regex}"
+                    _nl="\\n"
+                done
+
+                echo "s/${_pos_regex}.*$//g"
+            }
+        )"
+
+        while read _row
+        do
+            eval "$(
+                echo "${_row}" |
+                sed "${_remapper}" |
+                sed -e 's/[\=]\(.*\)$/=\"\1\"/g' -e 's/^/local '"${_prefix}"'/1'
+            )"
+
+            "${_fn}" $@ || break
+        done
+    fi
+}
