@@ -7,7 +7,15 @@ local_path="$(dirname "${actual_name}")"
 . "${local_path}/logging"
 
 tabular::separator() {
-    echo "|||"
+    if [ -n "${1}" ]
+    then
+        export __BASHLIB__SEPARATOR__="${1}"
+    elif [ -z "${__BASHLIB__SEPARATOR__}" ]
+    then
+        export __BASHLIB__SEPARATOR__="|||"
+    fi
+
+    echo "${__BASHLIB__SEPARATOR__}"
 }
 
 #==========================================================================

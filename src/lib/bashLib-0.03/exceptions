@@ -6,8 +6,12 @@ local_path="$(dirname "${actual_name}")"
 
 . "${local_path}/logging"
 
-exceptions::Unimplemented() {
-    logging::fatal "Unimplemented"
+exceptions::_base() {
+    logging::fatal "$@"
     exit 255
+}
+
+exceptions::Unimplemented() {
+    exceptions::_base "Unimplemented"
 }
 
