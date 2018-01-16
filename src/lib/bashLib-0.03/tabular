@@ -36,7 +36,7 @@ tabular::apply() {
     local _regex="$(echo "${2:-$(tabular::separator)}" | sed -e 's/./\[\\&\]/g')"
     local _prefix="_column_"
     local _columns
-    local _row
+    local _meta_row
     local _myfunction
 
     shift
@@ -72,10 +72,10 @@ tabular::apply() {
             }
         )"
 
-        while read _row
+        while read _meta_row
         do
             eval "$(
-                echo "${_row}" |
+                echo "${_meta_row}" |
                 sed "${_remapper}" |
                 sed -e 's/[\=]\(.*\)$/=\"\1\"/g' -e 's/^/local '"${_prefix}"'/1'
             )"
