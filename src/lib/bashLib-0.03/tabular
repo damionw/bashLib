@@ -32,7 +32,7 @@ tabular::separator() {
 #        column separator (defaults to tabular::separator())
 #==========================================================================
 tabular::apply() {
-    local _fn="${1:?Provide a function name}"
+    local _fn="${1:?Provide a function name or command string}"
     local _regex="$(echo "${2:-$(tabular::separator)}" | sed -e 's/./\[\\&\]/g')"
     local _prefix="_column_"
     local _columns
@@ -83,4 +83,15 @@ tabular::apply() {
             "${_fn}" $@ || break
         done
     fi
+}
+
+tabular::filter() {
+    local _fn="${1:?Provide a function name or command string}"
+    local _sep="${2:-$(tabular::separator)}"
+    local _cmd="${_fn}"' && echo "${_meta_row}"; true'
+    local _header
+
+    read _header
+    echo "${_header}"
+    (echo "${_header}"; cat) | tabular::apply "${_cmd}" "${_sep}"
 }
