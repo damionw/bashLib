@@ -18,15 +18,31 @@ logging::set_severity info
 #===================================================================================
 #                              Help Message
 #===================================================================================
-showhelp()
-{
-    contents=$(
-        echo "${*}" |
-        awk -F, '{for (i=1; i <= NF; ++i) {print $i;}}' |
-        awk -F: '{printf("%s[--%s%s]", sep, $1, (NF == 2 ? sprintf("=<%s>", $1) : "")); sep=" "}'
+showhelp() {
+    declare -A _keywords=(
+        [env]="Provide the current virtualenv path (if any)"
+        [lib]="Provide the library module import file"
+        [version]="Produce the library's version string"
+        [help]="Display instructions"
     )
 
-    echo "Usage: $0 ${contents}" >&2
+    local _terms="$(echo "${@}" | awk -F, '{for (i=1; i <= NF; ++i) {print $i;}}')"
+    local _topic
+
+    local _contents="$(
+        echo "${_terms}" | awk -F: '{printf("%s[--%s%s]", sep, $1, (NF == 2 ? sprintf("=<%s>", $1) : "")); sep=" "}'
+        echo
+
+        echo "${_terms}" | while read _topic
+        do
+            if [ -n "${_keywords["${_topic}"]}" ]
+            then
+                echo -e "\n--${_topic}: ${_keywords["${_topic}"]}" | sed -e 's/^./    &/g'
+            fi
+        done
+    )"
+
+    echo "Usage: $0 ${_contents}" >&2
 }
 
 #===================================================================================
