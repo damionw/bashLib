@@ -19,6 +19,10 @@ logging::set_severity info
 #                              Help Message
 #===================================================================================
 showhelp() {
+    local _synopsis="
+        Provide information about the bashlib module
+    "
+
     declare -A _keywords=(
         [env]="Provide the current virtualenv path (if any)"
         [lib]="Provide the library module import file"
@@ -31,15 +35,22 @@ showhelp() {
 
     local _contents="$(
         echo "${_terms}" | awk -F: '{printf("%s[--%s%s]", sep, $1, (NF == 2 ? sprintf("=<%s>", $1) : "")); sep=" "}'
-        echo
+        echo -en "${_synopsis:+\n}"
+        echo "${_synopsis}" | sed -e 's/^[ ]*//g' -e '/^[ ]*$/d'
 
-        echo "${_terms}" | while read _topic
-        do
-            if [ -n "${_keywords["${_topic}"]}" ]
-            then
-                echo -e "\n--${_topic}: ${_keywords["${_topic}"]}" | sed -e 's/^./    &/g'
-            fi
-        done
+        echo "${_terms}" | {
+            _prefix="\n"
+
+            while read _topic
+            do
+                if [ -n "${_keywords["${_topic}"]}" ]
+                then
+                    _fill="$(for ((i=$(echo -n "${_topic}" | wc -c); i < 15; ++i)); do echo -n " "; done)"
+                    echo -e "${_prefix}--${_topic}${_fill}${_keywords["${_topic}"]}" | sed -e 's/^./    &/g'
+                    _prefix=""
+                fi
+            done
+        }
     )"
 
     echo "Usage: $0 ${_contents}" >&2
