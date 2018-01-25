@@ -10,6 +10,7 @@ tabular::separator() {
     if [ -n "${1}" ]
     then
         export __BASHLIB__SEPARATOR__="${1}"
+        return 0
     elif [ -z "${__BASHLIB__SEPARATOR__}" ]
     then
         export __BASHLIB__SEPARATOR__="|||"
