@@ -23,7 +23,7 @@ showhelp() {
         Provide information about the bashlib module
     "
 
-    declare -A _keywords=(
+    local -A _keywords=(
         [env]="Provide the current virtualenv path (if any)"
         [lib]="Provide the library module import file"
         [version]="Produce the library's version string"

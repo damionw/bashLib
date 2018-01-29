@@ -23,7 +23,7 @@ showhelp() {
         Manage virtualenv installations
     "
 
-    declare -A _keywords=(
+    local -A _keywords=(
         [env:]="virtualenv path to create"
         [install:]="Install module from git repo"
         [git:]="Install module from git repo"
