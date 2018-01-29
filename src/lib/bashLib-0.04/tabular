@@ -10,7 +10,7 @@ tabular::separator() {
     if [ -n "${1}" ]
     then
         export __BASHLIB__SEPARATOR__="${1}"
-        return 0
+        return
     elif [ -z "${__BASHLIB__SEPARATOR__}" ]
     then
         export __BASHLIB__SEPARATOR__="|||"
@@ -49,6 +49,8 @@ tabular::apply() {
 
     if read _columns
     then
+        local _meta_rownumber=0
+
         local _meta_columns="$(
             echo "${_columns}" |
             tr '[A-Z]' '[a-z]' |
@@ -82,6 +84,8 @@ tabular::apply() {
             )"
 
             "${_fn}" $@ || break
+
+            ((++_meta_rownumber))
         done
     fi
 }
@@ -95,4 +99,16 @@ tabular::filter() {
     read _header
     echo "${_header}"
     (echo "${_header}"; cat) | tabular::apply "${_cmd}" "${_sep}"
+}
+
+tabular::where() {
+    # Convenience wrapper for filter, takes a bare comparison expression
+    # for one of the apply column names
+    # Example
+    # (echo one,two; echo 1,2; echo 4,5) | tabular::where 'one == 1' ,
+
+    local _clause="(( _column_"${1:?Need to provide a clause}" ))"
+    local _sep="${2:-$(tabular::separator)}"
+
+    tabular::filter "${_clause}" ${_sep}
 }
