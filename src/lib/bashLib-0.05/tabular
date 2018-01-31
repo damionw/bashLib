@@ -112,3 +112,8 @@ tabular::where() {
 
     tabular::filter "${_clause}" ${_sep}
 }
+
+tabular::transpose() {
+    # Turn single value column into row wise data
+    awk '{printf("%s%s", sep, $0); sep=separator;} END {printf("\n");}' separator="${1:-$(tabular::separator)}"
+}
