@@ -48,23 +48,23 @@ logging::format() {
 }
 
 logging::fatal() {
-    logging::format fatal $@
+    logging::format fatal "$@"
     exit 255
 }
 
 logging::error() {
-    logging::format error $@
+    logging::format error "$@"
 }
 
 logging::warning() {
-    logging::format warning $@
+    logging::format warning "$@"
 }
 
 logging::info() {
-    logging::format info $@
+    logging::format info "$@"
 }
 
 logging::debug() {
-    logging::format debug $@
+    logging::format debug "$@"
 }
 
