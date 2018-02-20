@@ -6,8 +6,13 @@ local_path="$(dirname "${actual_name}")"
 
 . "${local_path}/logging"
 
+virtualenv::python() {
+    # Prefer Python3 wherever possible
+    which python3 || which python
+}
+
 virtualenv::path() {
-    python -c 'import sys; print "" if not hasattr(sys, "real_prefix") else sys.prefix'
+    "$(virtualenv::python)" -c 'import sys; print(sys.prefix if (hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)) else "")'
 }
 
 virtualenv::create() {
@@ -16,7 +21,7 @@ virtualenv::create() {
     if [ -d "${_env}" ]
     then
         logging::warning "Using existing virtual environment in '${_env}'"
-    elif python -m venv --system-site-packages "${_env}" 2>/dev/null
+    elif "$(virtualenv::python)" -m venv --system-site-packages "${_env}" 2>/dev/null
     then
         logging::warning "Created virtual environment in '${_env}'"
     elif virtualenv "${_env}" --system-site-packages 2>/dev/null
