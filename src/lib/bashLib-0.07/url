@@ -1,0 +1,98 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+. "${local_path}/tabular"
+
+url::split() {
+#   <protocol>://<username>[:<password]@<host>/<path>[?...]
+
+    local _url="${1:?Need to provide a URL}"
+
+    local _contents="$(
+        echo "${_url}" | sed \
+            -e 's/^\([a-z][a-z]*\)[\:]/_http_protocol="\1"|/1' \
+            -e 's/[|][/][/]\([^:@]*\)[\:@]/|_http_username="\1"|\/\//1' \
+            -e 's/[|][/][/]\([^|@]*\)[\@]/|_http_password="\1"|\/\//1' \
+            -e 's/[|][/][/]\([^|\/]*\)[\/]/|_http_host="\1"|\/\//1' \
+            -e 's/[|][/][/]\([^|\?]*\)[\/]*/|_http_path="\1"|\/\//1' \
+            -e 's/[|][/][/]//1' \
+            -e 's/[\?\&]\([[:alnum:]]\+[\=][^\?\&]*\)/|_http_urlparameter_\1/g' \
+            -e 's/[|]/\n/g'
+    )"
+
+    echo "${_contents}"
+
+    # (re)Compile the urlparameters
+    echo "${_contents}" |
+    grep '^_http_urlparameter_'  |
+    sed -e 's/^_http_urlparameter_//g' |
+    tabular::transpose "&" |
+    sed -e 's/\&$//g' -e 's/^/_http_urlparameters="/g' -e 's/$/"/'
+}
+
+url::urlshell() {
+    local -a _parameters=()
+    local _use_global=false
+
+    for _parameter in "$@"
+    do
+        case "${_parameter}" in
+            --global)
+                _use_global=true
+                ;;
+
+            --*)
+                ;;
+
+            *)
+                _parameters[${#parameters[@]}]="${_parameter}"
+                ;;
+        esac
+    done
+
+    url::split "${_parameters[0]}" |
+    sed -e '/^[\t ]*$/d' |
+    ("${_use_global}" && cat || sed '-e s/^/local /g')
+}
+
+url::plain() {
+    eval "$(url::urlshell "$@")"
+    echo "${_http_protocol}://${_http_host}/${_http_path}${_http_parameters:+?}${_http_parameters}"
+}
+
+# Gleaned from https://stackoverflow.com/questions/296536/how-to-urlencode-data-for-curl-command
+url::encode() {
+  local string="${1:-$(cat)}"
+  local strlen=${#string}
+  local encoded=""
+  local pos c o
+
+  for (( pos=0 ; pos<strlen ; pos++ )); do
+     c=${string:$pos:1}
+     case "$c" in
+        [-_.~a-zA-Z0-9] ) o="${c}" ;;
+        * )               printf -v o '%%%02x' "'$c"
+     esac
+     encoded+="${o}"
+  done
+
+  echo "${encoded}"    # You can either set a return variable (FASTER) 
+}
+
+# Returns a string in which the sequences with percent (%) signs followed by
+# two hex digits have been replaced with literal characters.
+url::decode() {
+
+  # This is perhaps a risky gambit, but since all escape characters must be
+  # encoded, we can replace %NN with \xNN and pass the lot to printf -b, which
+  # will decode hex for us
+
+  local _content="${1:-$(cat)}"
+  printf -v REPLY '%b' "${_content//%/\\x}" # You can either set a return variable (FASTER)
+
+  echo "${REPLY}"  #+or echo the result (EASIER)... or both... :p
+}

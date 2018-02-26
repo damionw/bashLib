@@ -18,11 +18,32 @@ modules::install::git() {
         then
             logging::error "Failed to extract from repo '${_url}'"
             _result=false
-        elif ! (cd "${_tempdir}" && make install)
+        elif ! pushd "${_tempdir}" >/dev/null 2>&1
         then
-            logging::error "Couldn't install package from '${_url}'"
+            logging::error "Couldn't use temporary folder '${_tempdir}'"
             _result=false
         else
+            if [ -f Makefile ]
+            then
+                if ! make install
+                then
+                    logging::error "Failed running make on '${_url}'"
+                    _result=false
+                fi
+            elif [ -f setup.py ]
+            then
+                if ! "$(virtualenv::python)" setup.py install
+                then
+                    logging::error "Couldn't install python package from '${_url}'"
+                    _result=false
+                fi
+            fi
+
+            popd
+        fi
+
+        if ! ${_result}
+        then
             logging::info "Successfully installed branch '${_branch}' from package '${_url}'"
         fi
 
