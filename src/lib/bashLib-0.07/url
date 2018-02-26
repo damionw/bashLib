@@ -96,3 +96,26 @@ url::decode() {
 
   echo "${REPLY}"  #+or echo the result (EASIER)... or both... :p
 }
+
+url::simple_request() {
+    local _url="${1:?'Needs a URL'}"
+    local _content="${2:-'{}'}"
+    local _type="${3:-GET}"
+    local _http_username="$4" # Allow default via parameters
+    local _http_password="$5" # Allow default via parameters
+
+    eval "$(url::urlshell "${_url}")"
+
+    # Reconstruct URL without auth info
+    _url="${_http_protocol}://${_http_host}/${_http_path}${_http_urlparameters:+?}${_http_urlparamaters}"
+
+    logging::debug "URL=${_url}"
+
+    curl \
+        -d "${_content}" \
+        -s \
+        -X ${_type} \
+        ${_http_username:+-u} ${_http_username:+${_http_username}${_http_password:+:${_http_password}}} \
+        -H "Content-Type: application/json" \
+        "${_url}"
+}
