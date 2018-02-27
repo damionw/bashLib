@@ -98,11 +98,13 @@ url::decode() {
 }
 
 url::simple_request() {
-    local _url="${1:?'Needs a URL'}"
-    local _type="${2:-GET}"
-    local _content="${3:-'{}'}"
-    local _http_username="$4" # Allow default via parameters
-    local _http_password="$5" # Allow default via parameters
+    eval "$(arguments::formatter "$@")"
+
+    local _url="${kwargs["url"]:-${args[0]:?'Needs a URL'}}"
+    local _type="${kwargs["method"]:-${args[1]:-GET}}"
+    local _content="${kwargs["content"]:-${args[2]:-'{}'}}"
+    local _http_username="${kwargs["default_username"]:-}" # Allow default via parameters
+    local _http_password="${kwargs["default_password"]:-}" # Allow default via parameters
 
     eval "$(url::urlshell "${_url}")"
 
