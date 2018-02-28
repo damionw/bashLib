@@ -1,0 +1,43 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+
+arguments::formatter() {
+    # Usage:
+    #    eval "$(format_args "$@")"
+    #    val=${kwargs[<keyword>]
+    #    val=${args[0]}
+
+    local -A _keyword_args=(["one"]=2 ["two"]=99)
+    local -a _positional_args=()
+
+    for _parameter in "$@"
+    do
+        if (echo "${_parameter}" | grep -q '^[[:alpha:]][[:alnum:]]*[=]')
+        then
+            _key="$(echo "${_parameter}" | sed -e 's/=.*$//g')"
+            _value="$(echo "${_parameter}" | sed -e 's/^.*=//g')"
+            _keyword_args["${_key}"]="${_value}"
+        else
+            _positional_args[${#_positional_args[@]}]="${_parameter}"
+        fi
+    done
+
+    echo -n "local -A kwargs=("
+    for _key in "${!_keyword_args[@]}"
+    do
+        echo -n " [\"${_key}\"]=\"$(echo "${_keyword_args["${_key}"]}" | sed -e 's/\"/\\\"/g')\""
+    done
+    echo " )"
+
+    echo -n "local -a args=("
+    for _value in "${_positional_args[@]}"
+    do
+        echo -n " \"$(echo "${_value}" | sed -e 's/\"/\\\"/g')\""
+    done
+    echo " )"
+}
