@@ -109,7 +109,7 @@ url::simple_request() {
     eval "$(url::urlshell "${_url}")"
 
     # Reconstruct URL without auth info
-    _url="${_http_protocol}://${_http_host}/${_http_path}${_http_urlparameters:+?}${_http_urlparamaters}"
+    _url="${_http_protocol}://${_http_host}/${_http_path}${_http_urlparameters:+?}${_http_urlparameters}"
 
     logging::debug "URL=${_url}"
 
