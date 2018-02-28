@@ -25,3 +25,5 @@ lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 bashlib::version() {
     echo "${BASHLIB_VERSION}"
 }
+
+hash -r
