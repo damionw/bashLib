@@ -12,7 +12,7 @@ arguments::formatter() {
     #    val=${kwargs[<keyword>]
     #    val=${args[0]}
 
-    local -A _keyword_args=(["one"]=2 ["two"]=99)
+    local -A _keyword_args=()
     local -a _positional_args=()
 
     for _parameter in "$@"
