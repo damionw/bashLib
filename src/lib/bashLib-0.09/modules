@@ -1,0 +1,159 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+
+modules::install() {
+    modules::install::install "$@"
+}
+
+modules::install::repo_type() {
+    local _url="${1?Need to provide a GIT url}"
+
+    if GIT_ASKPASS="/bin/true" git ls-remote "${_url}" >/dev/null 2>&1
+    then
+        echo git
+        return
+    fi
+
+    if hg id "${_url}" >/dev/null 2>&1
+    then
+        echo hg
+        return
+    fi
+
+    return 255
+}
+
+modules::install::install() {
+    cleanup() {
+        local _level="${1:-0}"
+        [ "${_level}" -gt 0 ] && popd >/dev/null 2>&1
+        [ -n "${_tempdir}" ] && rm -rf "${_tempdir}"
+    }
+
+    local _url="${1?Need to provide a url}"
+    local _branch="${2}"
+    local _tempdir
+
+    if ! _tempdir="$(mktemp --directory --quiet)"
+    then
+        logging::error "Cannot create temporary folder"
+        cleanup 0
+        return 255
+    fi
+
+    case "$(modules::install::repo_type "${_url}")" in
+        hg)
+            if ! hg clone "${_url}" "${_tempdir}" --branch="${_branch:-default}" >/dev/null 2>&1
+            then
+                logging::error "Failed to checkout repo '${_url}' with branch ${_branch:-default}"
+                cleanup 0
+                return 254
+            fi
+            ;;
+
+        git)
+            if ! git clone "${_url}" "${_tempdir}" --branch="${_branch:-master}" >/dev/null 2>&1
+            then
+                logging::error "Failed to checkout repo '${_url}' with branch ${_branch:-master}"
+                cleanup 0
+                return 253
+            fi
+            ;;
+            
+        *)
+            logging::error "Unknown repo type ${_url}"
+            cleanup 0
+            return 255
+            ;;
+    esac
+
+    if ! pushd "${_tempdir}" >/dev/null 2>&1
+    then
+        logging::error "Couldn't use temporary folder '${_tempdir}'"
+        cleanup 0
+        return 252
+    fi
+
+    if [ -f Makefile ]
+    then
+        if ! make install
+        then
+            logging::error "Failed running make on '${_url}'"
+            cleanup 1
+            return 251
+        fi
+    elif [ -f setup.py ]
+    then
+        if ! "$(virtualenv::python)" setup.py install
+        then
+            logging::error "Couldn't install python package from '${_url}'"
+            cleanup 1
+            return 251
+        fi
+    else
+        logging::error "Unknown installation mechanism in ${_url}"
+        cleanup 1
+        return 251
+    fi
+
+    logging::info "Successfully installed branch '${_branch}' from package '${_url}'"
+    cleanup 1
+    return 0
+}
+
+modules::install::git() {
+    logging::warning "DEPRECATED: Use modules::install() instead!"
+    modules::install "$@"
+}
+
+modules::install::git_unused() {
+    local _url="${1?Need to provide a GIT url}"
+    local _branch="${2:-master}"
+    local _tempdir
+    local _result=true
+
+    if _tempdir="$(mktemp --directory --quiet)"
+    then
+        if ! git clone "${_url}" "${_tempdir}" --branch="${_branch}"
+        then
+            logging::error "Failed to extract from repo '${_url}'"
+            _result=false
+        elif ! pushd "${_tempdir}" >/dev/null 2>&1
+        then
+            logging::error "Couldn't use temporary folder '${_tempdir}'"
+            _result=false
+        else
+            if [ -f Makefile ]
+            then
+                if ! make install
+                then
+                    logging::error "Failed running make on '${_url}'"
+                    _result=false
+                fi
+            elif [ -f setup.py ]
+            then
+                if ! "$(virtualenv::python)" setup.py install
+                then
+                    logging::error "Couldn't install python package from '${_url}'"
+                    _result=false
+                fi
+            fi
+
+            popd
+        fi
+
+        if ! ${_result}
+        then
+            logging::info "Successfully installed branch '${_branch}' from package '${_url}'"
+        fi
+
+        rm -rf "${_tempdir}"
+    fi
+
+    "${_result}"
+}
