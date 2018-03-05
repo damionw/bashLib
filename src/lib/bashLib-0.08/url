@@ -111,7 +111,7 @@ url::simple_request() {
     # Reconstruct URL without auth info
     _url="${_http_protocol}://${_http_host}/${_http_path}${_http_urlparameters:+?}${_http_urlparameters}"
 
-    logging::debug "URL=${_url}"
+    logging::debug "${_type} ${_url}"
 
     curl \
         -d "${_content}" \
