@@ -8,7 +8,7 @@ local_path="$(dirname "${actual_name}")"
 
 arguments::formatter() {
     # Usage:
-    #    eval "$(format_args "$@")"
+    #    eval "$(arguments::formatter "$@")"
     #    val=${kwargs[<keyword>]
     #    val=${args[0]}
 

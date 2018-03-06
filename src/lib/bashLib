@@ -21,6 +21,7 @@ lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 . "${lib_path}/arguments"
 . "${lib_path}/virtualenv"
 . "${lib_path}/modules"
+. "${lib_path}/list"
 . "${lib_path}/url"
 
 bashlib::version() {

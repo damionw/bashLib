@@ -1,0 +1,53 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+. "${local_path}/arguments"
+
+list::from_pathvar() {
+    eval "$(arguments::formatter "$@")"
+
+    local _separator="${kwargs["separator"]:-:}"
+    local _contents="${kwargs["path"]:-${args[0]}}"
+
+    echo "${_contents}" | awk -F"${_separator}" '{for (i=1; i <= NF; ++i) {print $i;}}' | uniq
+}
+
+list::to_pathvar() {
+    eval "$(arguments::formatter "$@")"
+
+    local _separator="${kwargs["separator"]:-${args[0]:-:}}"
+    local _row
+    local _sep
+
+    while read _row
+    do
+        echo -n "${_sep}${_row}"
+        _sep="${_separator}"
+    done
+}
+
+list::filter_path() {
+    eval "$(arguments::formatter "$@")"
+
+    local _separator="${kwargs["separator"]:-:}"
+    local _contents="${kwargs["path"]:-${args[0]}}"
+    local _regex="${kwargs["regex"]:-'*'}"
+    local _not=
+
+    if (echo ${kwargs["negate"]} | egrep -q '^(true|1)$')
+    then
+        _not=-v
+    fi
+
+    list::from_pathvar separator="${_separator}" path="${_contents}" |
+    egrep ${_not} "${_regex}" |
+    list::to_pathvar separator="${_separator}"
+}
+
+list::to_regex() {
+    awk 'BEGIN {printf("(");} {printf("%s%s", sep, $0); sep="|";} END {printf(")\n");}'
+}
