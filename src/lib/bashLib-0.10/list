@@ -36,12 +36,7 @@ list::filter_path() {
     local _separator="${kwargs["separator"]:-:}"
     local _contents="${kwargs["path"]:-${args[0]}}"
     local _regex="${kwargs["regex"]:-'*'}"
-    local _not=
-
-    if (echo ${kwargs["negate"]} | egrep -q '^(true|1)$')
-    then
-        _not=-v
-    fi
+    local _not="$((echo ${kwargs["negate"]} | egrep -q '^(true|1)$') && echo "-v")"
 
     list::from_pathvar separator="${_separator}" path="${_contents}" |
     egrep ${_not} "${_regex}" |
@@ -75,5 +70,32 @@ list::addprefix() {
     while read _value
     do
         test -n "${_value}" && echo "${_prefix}=${_value}"
+    done
+}
+
+list::enumerate() {
+    eval "$(arguments::formatter "$@")"
+
+    local _separator="${kwargs["separator"]:-${args[0]:-" "}}"
+    local _index=0 _row
+
+    while read _row
+    do
+        echo "${_index}${_separator}${_row}"
+        ((++_index))
+    done
+}
+
+list::sentinel() {
+    eval "$(arguments::formatter "$@")"
+
+    local _regex="${kwargs["regex"]:-'*'}"
+    local _not="$((echo ${kwargs["negate"]} | egrep -q '^(true|1)$') && echo "-v")"
+    local _flag= _row=
+
+    while read _row
+    do
+        (echo "${_row}" | egrep -q ${_not} "${_regex}") && _flag=1
+        [ -n "${_flag}" ] && echo "${_row}"
     done
 }
