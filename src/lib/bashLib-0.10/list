@@ -51,3 +51,29 @@ list::filter_path() {
 list::to_regex() {
     awk 'BEGIN {printf("(");} {printf("%s%s", sep, $0); sep="|";} END {printf(")\n");}'
 }
+
+list::range() {
+    eval "$(arguments::formatter "$@")"
+
+    local _start="${kwargs["start"]:-${args[1]:-0}}"
+    local _stop="${kwargs["stop"]:-${args[0]:-1}}"
+    local _step="${kwargs["step"]:-${args[2]:-1}}"
+
+    awk 'END {
+        for (i=_start; i < _stop; i += _step) {
+            printf("%d\n", i);
+        }
+    }' _start="${_start}" _stop="${_stop}" _step="${_step}" <<< ""
+}
+
+list::addprefix() {
+    eval "$(arguments::formatter "$@")"
+
+    local _prefix="${kwargs["prefix"]:-${args[0]:?Not enough parameters for addprefix}}"
+    local _value
+
+    while read _value
+    do
+        test -n "${_value}" && echo "${_prefix}=${_value}"
+    done
+}
