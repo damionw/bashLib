@@ -1,0 +1,57 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+. "${local_path}/arguments"
+
+process::lineage() {
+    get_process_details() {
+        test -f /proc/${1:-$$}/status && cat < "/proc/${1:-$$}/status"
+    }
+
+    get_detail_key() {
+        awk '/^'"${1}"'[\:]/ {if (! found) {print $NF; found=1;}}' found=0
+    }
+
+    get_process_info() {
+        pid=${1:-$$}
+        header=${2:-false}
+        sep="${3:-,}"
+
+        ${header} && echo "PID${sep}PPID${sep}EXEC"
+        details="$(get_process_details $pid)"
+        separator=
+
+        for key in Pid PPid Name
+        do
+            echo -n "${separator}$(echo "$details" | get_detail_key "${key}")"
+            separator=$sep
+        done
+
+        echo
+    }
+
+    get_parent() {
+        declare ppid=$(get_process_details ${1:-$$} | get_detail_key "PPid")
+
+        if [ -n "${ppid}" -a -d "/proc/$ppid/" ]
+        then
+            get_parent $ppid
+            echo $ppid
+        fi
+    }
+
+    eval "$(arguments::formatter "$@")"
+
+    local _pid="${kwargs["pid"]:-${args[0]:-$$}}"
+    local _header=true
+
+    for _pid in $(get_parent "${_pid}") "${_pid}"
+    do
+        get_process_info "${_pid}" "${_header}"
+        _header=false
+    done
+}

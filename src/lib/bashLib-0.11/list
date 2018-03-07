@@ -99,3 +99,19 @@ list::sentinel() {
         [ -n "${_flag}" ] && echo "${_row}"
     done
 }
+
+list::trim() {
+    sed -e 's/\[#].*$//g' -e 's/^[ ]*//g' -e 's/[ ]*$//g' -e '/^$/d'
+}
+
+# list::apply() {
+#     eval "$(arguments::formatter "$@")"
+# 
+#     local _command="${kwargs["command"]:-${args[0]:-echo}}"
+#     local _row
+# 
+#     list::trim | while read _row
+#     do
+#         ${_command} "${_row}"
+#     done
+# }
