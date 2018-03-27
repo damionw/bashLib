@@ -118,3 +118,42 @@ tabular::transpose() {
     # Turn single value column into row wise data
     awk '{printf("%s%s", sep, $0); sep=separator;} END {printf("\n");}' separator="${1:-$(tabular::separator)}"
 }
+
+tabular::merge() {
+    eval "$(arguments::formatter "$@")"
+
+    local _offset=${kwargs["offset"]:-10}
+    local _sep="$(tabular::separator)"
+    local _count=${_offset:-0}
+    local _filename
+
+    for _filename in "$@"
+    do
+        eval exec "${_count}<${_filename}"
+        ((++_count))
+    done
+
+    local -a _values=()
+    local _row
+    local _fd
+    local _col
+    local _s
+
+    test "${_count}" -gt "${_offset}" && while true
+    do
+        _values=()
+
+        for ((_fd=${_offset}; _fd < ${_count}; ++_fd)) {
+            eval read _row "<&${_fd}" || return 255
+            _values[${#_values[@]}]="${_row}"
+        }
+
+        _s=
+
+        for ((_col=0; _col < ${#_values[@]}; ++_col)) {
+            echo -n "${_s}${_values[${_col}]}"
+            _s="${_sep}"
+        }
+        echo
+    done
+}
