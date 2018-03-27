@@ -120,14 +120,16 @@ tabular::transpose() {
 }
 
 tabular::merge() {
+    # Merge multiple files row by row (will force rectilinear)
+
     eval "$(arguments::formatter "$@")"
 
     local _offset=${kwargs["offset"]:-10}
-    local _sep="$(tabular::separator)"
+    local _sep="${kwargs["separator"]:-$(tabular::separator)}"
     local _count=${_offset:-0}
     local _filename
 
-    for _filename in "$@"
+    for _filename in "${args[@]}"
     do
         eval exec "${_count}<${_filename}"
         ((++_count))
