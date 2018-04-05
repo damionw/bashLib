@@ -14,6 +14,8 @@ export BASHLIB_VERSION="$(
 
 lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 
+export BASHLIB_SUBCOMMANDS_PATH="${lib_path}/subcommands"
+
 . "${lib_path}/logging"
 . "${lib_path}/tabular"
 . "${lib_path}/exceptions"
@@ -28,6 +30,14 @@ lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 
 bashlib::version() {
     echo "${BASHLIB_VERSION}"
+}
+
+bashlib::subcommands::path() {
+    echo "${BASHLIB_SUBCOMMANDS_PATH}"
+}
+
+bashlib::subcommands() {
+    find "$(bashlib::subcommands::path)" -type f -printf "%f\n" 2>/dev/null
 }
 
 hash -r
