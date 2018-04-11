@@ -15,11 +15,17 @@ logging::set_severity info
 #===================================================================================
 showhelp() {
     local _synopsis="
-        Maintain services list
+        Maintain running containers
     "
 
     local -A _keywords=(
-        [groups]="Produce a list of known service groups"
+        [start]="Start a container"
+        [stop]="Stop a container"
+        [rebuild]="Rebuild a container"
+        [cleanup]="Delete a container"
+        [instance:]="Specify a container instance"
+        [image:]="Specify an image name"
+        [tag:]="Specify an image tag (default: latest)"
         [version]="Produce the version string"
         [help]="Display instructions"
     )
@@ -29,7 +35,7 @@ showhelp() {
 
     local _contents="$(
         echo "${_terms}" | awk -F: '{printf("%s[--%s%s]", sep, $1, (NF == 2 ? sprintf("=<%s>", $1) : "")); sep=" "}'
-        echo -en "${_synopsis:+\n}"
+        echo -en "${_synopsis:+\n\n}"
         echo "${_synopsis}" | sed -e 's/^[ ]*//g' -e '/^[ ]*$/d'
 
         echo "${_terms}" | {
@@ -55,7 +61,7 @@ showhelp() {
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,groups,group::"
+long_options="help,version,debug,info,warning,error,fatal,start,stop,rebuild,cleanup,status,instance:,name:,image:,tag:"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -72,7 +78,10 @@ eval set -- "$OPTION_TEMP"
 # NOTE: The command line parameters are available for scripts which
 #       source this file.
 #===================================================================================
-selected_group=Default
+action=
+image=
+tag=
+instance_name=
 
 while true
 do
@@ -82,20 +91,24 @@ do
             shift
             ;;
 
-        --group)
-            if [ -z "${2}" ]
-            then
-                echo "${selected_group}"
-                exit 0
-            else
-                selected_group="${2}"
-            fi
+        --start|--stop|--rebuild|--cleanup|--status)
+            action="$(echo "${1}" | sed -e 's/^[-]*//g')"
+            shift
+            ;;
 
+        --image)
+            image="$2"
             shift 2
             ;;
 
-        --groups)
-            exit $?
+        --instance|--name)
+            instance_name="$2"
+            shift 2
+            ;;
+
+        --tag)
+            tag="$2"
+            shift 2
             ;;
 
         --version)
@@ -114,3 +127,37 @@ do
             ;;
     esac
 done
+
+if [ -z "${instance_name}" ]
+then
+    logging::fatal "An instance name must be provided"
+fi
+
+#===================================================================================
+#                             Perform selected action
+#===================================================================================
+case "${action}" in
+    start)
+        container::start instance="${instance_name}" image="${image}" tag="${tag}"
+        exit $?
+        ;;
+
+    rebuild)
+        container::rebuild instance="${instance_name}" image="${image}" tag="${tag}"
+        exit $?
+        ;;
+
+    status)
+        container::instance instance="${instance_name}"
+        exit $?
+        ;;
+
+    stop)
+        container::stop instance="${instance_name}"
+        exit $?
+        ;;
+
+    *)
+        logging::fatal "Unknown or invalid action '${action}'"
+        ;;
+esac

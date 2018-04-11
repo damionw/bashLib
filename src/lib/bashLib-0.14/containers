@@ -182,6 +182,23 @@ container::stop() {
     done
 }
 
+container::instance() {
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+    local _container_id
+
+    container::get_instance_id instance="${_instance_name}" | while read _container_id
+    do
+        container::invoke ps -a --filter="id=${_container_id}" |
+        awk '{if (NR > 1) {print $1, $NF, substr($0, 85);}}' |
+        awk '{print $1, $2, $3;}'
+        return 0
+    done
+
+    return 128
+}
+
 container::cleanup() {
     eval "$(arguments::formatter "$@")"
 
