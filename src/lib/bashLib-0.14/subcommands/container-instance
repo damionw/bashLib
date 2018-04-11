@@ -19,6 +19,7 @@ showhelp() {
     "
 
     local -A _keywords=(
+        [status]="List container states"
         [start]="Start a container"
         [stop]="Stop a container"
         [rebuild]="Rebuild a container"
@@ -61,7 +62,7 @@ showhelp() {
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,start,stop,rebuild,cleanup,status,instance:,name:,image:,tag:"
+long_options="help,version,debug,info,warning,error,fatal,start,stop,rebuild,cleanup,status,instance:,name:,image:,tag:,console"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -91,7 +92,7 @@ do
             shift
             ;;
 
-        --start|--stop|--rebuild|--cleanup|--status)
+        --start|--stop|--rebuild|--cleanup|--status|--console)
             action="$(echo "${1}" | sed -e 's/^[-]*//g')"
             shift
             ;;
@@ -128,32 +129,32 @@ do
     esac
 done
 
-if [ -z "${instance_name}" ]
-then
-    logging::fatal "An instance name must be provided"
-fi
-
 #===================================================================================
 #                             Perform selected action
 #===================================================================================
 case "${action}" in
     start)
-        container::start instance="${instance_name}" image="${image}" tag="${tag}"
+        container::instance::start instance="${instance_name}" image="${image}" tag="${tag}"
         exit $?
         ;;
 
     rebuild)
-        container::rebuild instance="${instance_name}" image="${image}" tag="${tag}"
+        container::instance::rebuild instance="${instance_name}" image="${image}" tag="${tag}"
         exit $?
         ;;
 
     status)
-        container::instance instance="${instance_name}"
+        container::instance::instances instance="${instance_name}"
         exit $?
         ;;
 
     stop)
-        container::stop instance="${instance_name}"
+        container::instance::stop instance="${instance_name}"
+        exit $?
+        ;;
+
+    console)
+        container::instance::console instance="${instance_name}"
         exit $?
         ;;
 

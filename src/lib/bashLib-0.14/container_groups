@@ -1,267 +1,119 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 
 first_name="${BASH_SOURCE[0]}"
 actual_name="$(readlink -f "${first_name}")"
 local_path="$(dirname "${actual_name}")"
 
 . "${local_path}/logging"
+. "${local_path}/tabular"
+. "${local_path}/container_instances"
 
-docker::get_instance_name() {
-    local _group="${1:?Provide a group name}"
-    local _service="${2:?Provide an service name}"
-    local _instance_name="$(echo "${_group}...${_service}" | tr '[A-Z]' '[a-z]')"
-    echo "${_instance_name}"
+container::group::separator() {
+    echo "..."
 }
 
-docker::cleanup_instance() {
-    local _group="${1:?Provide a group name}"
-    local _service="${2:?Provide an service name}"
-    local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
-    local _container_id
-
-    docker::stop_instance "${_group}" "${_service}"
-
-    docker::invoke ps -a --filter "name=${_instance_name}" | awk '{if (NR > 1) {print $1;}}' | while read _container_id
-    do
-        logging::warning "Removing instance ${_instance_name} as ${_container_id}"
-        docker::invoke rm "${_container_id}"
-    done
-
-    docker::invoke rmi "${_instance_name}"
-}
-
-docker::stop_instance() {
-    local _group="${1:?Provide a group name}"
-    local _service="${2:?Provide an service name}"
-    local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
-    local _container_id=
-
-    docker::invoke ps --filter "name=${_instance_name}" --filter "status=running" | awk '{if (NR == 2) {print $1;}}' | while read _container_id
-    do
-        logging::warning "Stopping instance ${_instance_name} as ${_container_id}"
-        docker::invoke kill "${_container_id}"
-    done
-}
-
-docker::start_instance() {
-    # arguments: <group name> <base image> <service instance name> [<startup_script> [<installation_script>]]
-
-    local _group="${1:?Provide a group name}"
-    local _image="${2:?Provide a container image}"
-    local _service="${3:?Provide an service name}"
-    local _startup_script="${4}"
-    local _install_script="${5}"
-    local _privileged= # --privileged
-
-    local _instance_name="$(docker::get_instance_name "${_group}" "${_service}")"
-
-    #------------------------------------
-    # Detect running instance
-    #------------------------------------
-    local _container_id="$(docker::invoke ps --filter "name=${_instance_name}" --filter "status=running" | awk '{if (NR == 2) {print $1;}}')"
-
-    if [ -n "${_container_id}" ]
-    then
-        logging::info "${_instance_name} is already running"
-        echo "${_instance_name}"
-        return 0
-    fi
-
-    #------------------------------------
-    # (re)start stopped instance
-    #------------------------------------
-    local _container_id="$(docker::invoke ps --filter "name=${_instance_name}" --filter "status=exited" | awk '{if (NR == 2) {print $1;}}')"
-
-    if [ -n "${_container_id}" ]
-    then
-        logging::warning "Restarting stopped service instance(s) ${_instance_name}"
-
-        if docker::invoke start "${_container_id}"
-        then
-            echo "${_instance_name}"
-            return 0
-        fi
-    fi
-
-    #------------------------------------
-    # Create new instance from base image
-    #------------------------------------
-    logging::warning "Cleaning up previous service instance(s) of ${_instance_name}"
-
-    # Cleanup all prexisting containers
-    docker::cleanup_instance "${_group}" "${_service}"
-
-    local _temp_folder="$(mktemp -d)"
-
-    (echo "#! /usr/bin/env bash"; echo true) | tee "${_temp_folder}/startup" | tee "${_temp_folder}/install" >/dev/null
-
-    if [ -n "${_startup_script}" -a -e "${_startup_script}" ]
-    then
-        cp "${_startup_script}" "${_temp_folder}/startup"
-    fi
-
-    if [ -n "${_install_script}" -a -e "${_install_script}" ]
-    then
-        cp "${_install_script}" "${_temp_folder}/install"
-    fi
-
-    chmod 755 "${_temp_folder}/install" "${_temp_folder}/startup"
-
-    for ((i=0; i < 2; ++i)) {
-        # Try and 'boot' from a prepared image
-
-        docker::invoke run \
-            --name="${_instance_name}" \
-            ${_privileged} \
-            --detach \
-            --volume="${_temp_folder}:/mnt/boot" \
-            "${_instance_name}" \
-            /bin/bash -cx "/mnt/boot/startup && exec sleep 86400"
-
-        if [ $? = 0 ]
-        then
-            logging::info "Started instance '${_instance_name}'"
-            echo "${_instance_name}"
-            return 0
-        fi
-
-        logging::warning "Configuring new image for instance '${_instance_name}'"
-
-        # No image exists, so 'install' from the base image
-        docker::image "${_image}"
-
-        local _uuid="$(uuidgen)" # Temporary name for the image build container
-
-        # Create a new container and initialize/install components and wait while it runs
-        docker::invoke run \
-            --name="${_uuid}" \
-            ${_privileged} \
-            --volume="${_temp_folder}:/mnt/boot" \
-            "${_image}" \
-            /bin/sh -c '/mnt/boot/install'
-
-        logging::warning "Install status = $?"
-
-        # Commit our new image
-        docker::invoke commit \
-            "${_uuid}" \
-            "${_instance_name}"
-
-        docker::invoke rm "${_uuid}"
+container::group::grouped_containers() {
+    header() {
+        {
+            echo "Id"
+            echo "Instance"
+            echo "Group"
+            echo "Service"
+            echo "Tag"
+            echo "State"
+        } | tabular::transpose "${_sep}"
     }
 
-    logging::warning "Couldn't create or start ${_instance_name}"
-    return 255
-}
-
-docker::rebuild_instance() {
-    # arguments: <group name> <base image> <service instance name> [<startup_script> [<install_script>]]
-
-    local _group="${1:?Provide a group name}"
-    local _image="${2:?Provide a container image}"
-    local _service="${3:?Provide an service name}"
-    local _startup_script="${4}"
-    local _init_script="${5}"
-
-    docker::stop_instance "${_group}" "${_service}"
-    docker::cleanup_instance "${_group}" "${_service}"
-    docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_script}" "${_init_script}"
-}
-
-docker::_formatting::group_members() {
-    jq -r '
-        .["groups"] |
-        . as $in | keys[] |
-        . as $group |
-        $in[.][] |
-        $group + "|||" +
-        .["image"] + "|||" +
-        .["name"] + "|||" +
-        .["startup"] + "|||" +
-        .["install"]
-    '
-}
-
-docker::_formatting::splitter() {
-    awk -F"[|][|][|]" '{print $pos}' pos=${1:-1}
-}
-
-docker::start_group() {
-    # arguments: <json string>
-    #
-    # e.g.
-    # {
-    #     "groups": {
-    #         <group name> : [
-    #             {
-    #                 "name": <service name>,
-    #                 "image": <base image>,
-    #                 "install": <script string>,
-    #                 "startup": <script string>
-    #             }
-    #         ]
-    #     }
-    # }
-
-    local _group_definition="${1:?Need JSON suite definition}"
-    local _row
-    local _flattened="$(echo "${_group_definition}" | docker::_formatting::group_members)"
-
-    while read _row
-    do
-        local _group="$(docker::_formatting::splitter 1 <<< "${_row}")"
-        local _image="$(docker::_formatting::splitter 2 <<< "${_row}")"
-        local _service="$(docker::_formatting::splitter 3 <<< "${_row}")"
-        local _startup="$(docker::_formatting::splitter 4 <<< "${_row}")"
-        local _install="$(docker::_formatting::splitter 5 <<< "${_row}")"
-
-        if [ -n "${_startup}" ]
+    formatter() {
+        if [ "${_column_name}" != "${_column_name/${_group_sep}}" ]
         then
-            local _startup_path="$(mktemp)"
-            echo "${_startup}" > "${_startup_path}"
+            {
+                local _group="${_column_name/${_group_sep}*}"
+                local _suffix="${_column_name/*${_group_sep}}"
+                local _service="${_suffix/:*}"
+                local _tag="${_suffix/*:}"
+
+                echo "${_column_id}"
+                echo "${_column_name}"
+                echo "${_group}"
+                echo "${_service}"
+                echo "${_tag}"
+                echo "${_column_state}" | tr '[A-Z]' '[a-z]'
+            } | tabular::transpose "${_sep}"
         fi
+    }
 
-        if [ -n "${_install}" ]
-        then
-            local _install_path="$(mktemp)"
-            echo "${_install}" > "${_install_path}"
-        fi
+    local _group_sep="$(container::group::separator)"
+    local _sep="$(container::instance::separator)"
 
-        docker::start_instance "${_group}" "${_image}" "${_service}" "${_startup_path}" "${_install_path}"
-    done <<< "${_flattened}"
+    container::instance::instances | {
+        header
+        tabular::apply formatter "${_sep}"
+    }
 }
 
-docker::stop_group() {
-    local _group_definition="${1:?Need JSON suite definition}"
-    local _flattened="$(echo "${_group_definition}" | docker::_formatting::group_members)"
-    local _row
-
-    while read _row
-    do
-        local _group="$(docker::_formatting::splitter 1 <<< "${_row}")"
-        local _service="$(docker::_formatting::splitter 3 <<< "${_row}")"
-
-        docker::stop_instance "${_group}" "${_service}"
-    done <<< "${_flattened}"
+container::group::groups() {
+    local _sep="$(container::instance::separator)"
+    container::group::grouped_containers |
+    tabular::apply 'echo "${_column_group}"' "${_sep}" |
+    sort -u
 }
 
-docker::cleanup_group() {
-    local _group_definition="${1:?Need JSON suite definition}"
-    local _flattened="$(echo "${_group_definition}" | docker::_formatting::group_members)"
-    local _row
+container::group::container_group() {
+    eval "$(arguments::formatter "$@")"
 
-    while read _row
-    do
-        local _group="$(docker::_formatting::splitter 1 <<< "${_row}")"
-        local _service="$(docker::_formatting::splitter 3 <<< "${_row}")"
+    local _group_name="${kwargs["group"]:-${args[0]:?Provide a group name}}"
+    local _sep="$(container::instance::separator)"
 
-        docker::cleanup_instance "${_group}" "${_service}"
-    done <<< "${_flattened}"
+    container::group::grouped_containers |
+    tabular::filter '[ "${_column_group}" = "'"${_group_name}"'" ]' "${_sep}"
 }
 
-docker::rebuild_group() {
-    local _group_definition="${1:?Need JSON suite definition}"
+container::group::format_instance_name() {
+    eval "$(arguments::formatter "$@")"
 
-    docker::cleanup_group "${_group_definition}"
-    docker::start_group "${_group_definition}"
+    local _group_name="${kwargs["group"]:-${args[0]:?Provide a group name}}"
+    local _service_name="${kwargs["service"]:-${args[1]:?Provide a service name}}"
+
+    {
+        echo "${_group_name}"
+        echo "${_service_name}"
+    } | tabular::transpose "$(container::group::_separator)"
+}
+
+container::group::start_instance() {
+    # Start an instance in a container 'group'
+
+    eval "$(arguments::formatter "$@")"
+
+    local _group_name="${kwargs["group"]:-${args[0]:?Provide a group name}}"
+    local _service_name="${kwargs["service"]:-${args[1]:?Provide a service name}}"
+    local _image="${kwargs["image"]:-${args[2]}}"
+    local _tag="${kwargs["tag"]:-${args[3]:-latest}}"
+    local _startup_script="${kwargs["startup"]}"
+    local _install_script="${kwargs["install"]}"
+
+    local _instance_name="$(
+        container::group::format_instance_name group="${_group_name}" service="${_service_name}"
+    )"
+
+    container::instance::start \
+        instance="${_instance_name}" \
+        tag="${_tag}" \
+        startup="${_startup_script}" \
+        install="${_install_script}" \
+        image="${_image}"
+}
+
+container::group::stop_instance() {
+    eval "$(arguments::formatter "$@")"
+
+    local _group_name="${kwargs["group"]:-${args[0]:?Provide a group name}}"
+    local _service_name="${kwargs["service"]:-${args[1]:?Provide a service name}}"
+
+    local _instance_name="$(
+        container::group::format_instance_name group="${_group_name}" service="${_service_name}"
+    )"
+
+    container::instance::stop instance="${_instance_name}"
 }

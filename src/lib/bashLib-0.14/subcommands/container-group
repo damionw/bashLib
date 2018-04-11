@@ -15,7 +15,7 @@ logging::set_severity info
 #===================================================================================
 showhelp() {
     local _synopsis="
-        Maintain services list
+        Maintain grouped services
     "
 
     local -A _keywords=(
@@ -55,7 +55,7 @@ showhelp() {
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,groups,group::"
+long_options="help,version,debug,info,warning,error,fatal,groups"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -95,6 +95,7 @@ do
             ;;
 
         --groups)
+            container::group::groups
             exit $?
             ;;
 

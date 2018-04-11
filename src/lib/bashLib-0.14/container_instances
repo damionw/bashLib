@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 
 first_name="${BASH_SOURCE[0]}"
 actual_name="$(readlink -f "${first_name}")"
@@ -6,37 +6,73 @@ local_path="$(dirname "${actual_name}")"
 
 . "${local_path}/logging"
 . "${local_path}/arguments"
+. "${local_path}/tabular"
 
-container::invoke() {
+container::instance::invoke() {
     sudo -A docker "$@"
 }
 
-container::get_instance_id() {
-    eval "$(arguments::formatter "$@")"
-
-    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
-    local _status="${kwargs["status"]:-${args[1]}}"
-
-    {
-        if [ -n "${_status}" ]
-        then
-            container::invoke ps -a --filter "name=${_instance_name}" --filter "status=${_status}" |
-            awk '{if (NR == 2) {print $1;}}'
-        else
-            container::invoke ps -a --filter "name=${_instance_name}" |
-            awk '{if (NR > 1) {print $1;}}'
-        fi
-    } | sed -e '/^[ ]*$/d'
+container::instance::separator() {
+    echo "|"
 }
 
-container::image() {
+container::instance::instances() {
     eval "$(arguments::formatter "$@")"
 
-    local _image="${kwargs["image"]:-${args[0]:?Provide a container image}}" ### <image>[:<tag>] ###
+    local -a _filters=()
+
+    local _instance_name="${kwargs["instance"]:-${args[0]}}"
+    local _status="${kwargs["status"]:-${args[1]}}"
+    local _sep="${kwargs["separator"]:-$(container::instance::separator)}"
+
+    if [ -n "${_instance_name}" ]
+    then
+        _filters[${#_filters[@]}]="--filter=name=${_instance_name}"
+    fi
+
+    if [ -n "${_status}" ]
+    then
+        _filters[${#_filters[@]}]="--filter=status=${_status}"
+    fi
+
+    echo "Id${_sep}Name${_sep}State"
+
+    local _rows
+
+    _rows="$(
+        container::instance::invoke ps -a "${_filters[@]}" | awk '{
+            if (NR == 1) {
+                loc = index($0, "STATUS");
+            }
+            else if (loc > 0) {
+                split(substr($0, loc), ar, " ");
+                status = ar[1];
+                printf("%s%s%s%s%s\n", $1, sep, $2, sep, status);
+            }
+        }' sep="${_sep}"
+    )" || return $?
+
+    if [ "$(echo "${_rows}" | wc -l)" -lt 1 ]
+    then
+        return 125
+    fi
+
+    echo "${_rows}"
+}
+
+container::instance::get_instance_id() {
+    container::instance::instances "$@" |
+    tabular::apply 'echo ${_column_id}' "$(container::instance::separator)"
+}
+
+container::instance::image() {
+    eval "$(arguments::formatter "$@")"
+
+    local _image="${kwargs["image"]:-${args[0]:?Provide a container image}}"
     local _tag="${kwargs["tag"]:-${args[1]:-"-latest"}}"
 
     local _matches="$(
-        container::invoke images "${_image}" |
+        container::instance::invoke images "${_image}" |
         awk '{if ($2 == tag) {print $0;}}' tag="${_tag}" |
         wc -l
     )"
@@ -48,25 +84,20 @@ container::image() {
     fi
 
     logging::warning "Importing image ${_image} tag ${_tag}"
-    container::invoke pull "${_image}:${_tag}"
+    container::instance::invoke pull "${_image}:${_tag}"
 }
 
-container::start() {
+container::instance::start() {
     # arguments: <group name> <base image> <service instance name> [<startup_script> [<installation_script>]]
 
     eval "$(arguments::formatter "$@")"
 
     local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
-    local _image="${kwargs["image"]:-${args[1]:?Provide a container image}}" ### <image>[:<tag>] ###
-    local _tag="${kwargs["tag"]:-${args[2]:-latest}}"
-    local _startup_script="${kwargs["startup"]}"
-    local _install_script="${kwargs["install"]}"
-    local _privileged= # --privileged
 
     #------------------------------------
     # Detect running instance
     #------------------------------------
-    local _container_id="$(container::get_instance_id instance="${_instance_name}" status="running")"
+    local _container_id="$(container::instance::get_instance_id instance="${_instance_name}" status="running")"
 
     if [ -n "${_container_id}" ]
     then
@@ -78,13 +109,13 @@ container::start() {
     #------------------------------------
     # (re)start stopped instance
     #------------------------------------
-    local _container_id="$(container::get_instance_id instance="${_instance_name}" status="exited")"
+    local _container_id="$(container::instance::get_instance_id instance="${_instance_name}" status="exited")"
 
     if [ -n "${_container_id}" ]
     then
         logging::warning "Restarting stopped service instance(s) ${_instance_name}"
 
-        if container::invoke start "${_container_id}"
+        if container::instance::invoke start "${_container_id}"
         then
             echo "${_instance_name}"
             return 0
@@ -97,8 +128,13 @@ container::start() {
     logging::warning "Cleaning up previous service instance(s) of ${_instance_name}"
 
     # Cleanup all prexisting containers
-    container::cleanup instance="${_instance_name}"
+    container::instance::cleanup instance="${_instance_name}"
 
+    local _image="${kwargs["image"]:-${args[1]:?Provide a container image}}" ### <image>[:<tag>] ###
+    local _tag="${kwargs["tag"]:-${args[2]:-latest}}"
+    local _startup_script="${kwargs["startup"]}"
+    local _install_script="${kwargs["install"]}"
+    local _privileged= # --privileged
     local _temp_folder="$(mktemp -d)"
 
     # Prep default startup and installer scripts
@@ -125,7 +161,7 @@ container::start() {
     for ((i=0; i < 2; ++i)) {
         # Try and 'boot' from a prepared image
 
-        container::invoke run \
+        container::instance::invoke run \
             --name="${_instance_name}" \
             ${_privileged} \
             --detach \
@@ -143,12 +179,12 @@ container::start() {
         logging::warning "Configuring new image for instance '${_instance_name}'"
 
         # No image exists, so 'install' from the base image
-        container::image "${_image}:${_tag}"
+        container::instance::image "${_image}:${_tag}"
 
         local _uuid="$(uuidgen)" # Temporary name for the image build container
 
         # Create a new container and initialize/install components and wait while it runs
-        container::invoke run \
+        container::instance::invoke run \
             --name="${_uuid}" \
             ${_privileged} \
             --volume="${_temp_folder}:/mnt/boot" \
@@ -158,71 +194,70 @@ container::start() {
         logging::warning "Install status = $?"
 
         # Commit our new image
-        container::invoke commit \
+        container::instance::invoke commit \
             "${_uuid}" \
             "${_instance_name}"
 
-        container::invoke rm "${_uuid}"
+        container::instance::invoke rm "${_uuid}"
     }
 
     logging::warning "Couldn't create or start ${_instance_name}"
     return 255
 }
 
-container::stop() {
+container::instance::stop() {
     eval "$(arguments::formatter "$@")"
 
     local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
     local _container_id=
 
-    container::get_instance_id instance="${_instance_name}" status="running" | while read _container_id
+    while read _container_id
     do
         logging::warning "Stopping instance ${_instance_name} as ${_container_id}"
-        container::invoke kill "${_container_id}"
-    done
+        container::instance::invoke kill "${_container_id}"
+    done <<< "$(container::instance::get_instance_id instance="${_instance_name}" status="running")"
 }
 
-container::instance() {
+container::instance::cleanup() {
     eval "$(arguments::formatter "$@")"
 
     local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
     local _container_id
 
-    container::get_instance_id instance="${_instance_name}" | while read _container_id
-    do
-        container::invoke ps -a --filter="id=${_container_id}" |
-        awk '{if (NR > 1) {print $1, $NF, substr($0, 85);}}' |
-        awk '{print $1, $2, $3;}'
-        return 0
-    done
+    container::instance::stop instance="${_instance_name}"
 
-    return 128
-}
-
-container::cleanup() {
-    eval "$(arguments::formatter "$@")"
-
-    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
-    local _container_id
-
-    container::stop instance="${_instance_name}"
-
-    container::get_instance_id instance="${_instance_name}" | while read _container_id
+    while read _container_id
     do
         logging::warning "Removing instance ${_instance_name} as ${_container_id}"
-        container::invoke rm "${_container_id}"
-    done
+        container::instance::invoke rm "${_container_id}"
+    done <<< "$(container::instance::get_instance_id instance="${_instance_name}")"
 
-    container::invoke rmi "${_instance_name}"
+    container::instance::invoke rmi "${_instance_name}"
 }
 
-container::rebuild() {
-    # Parameters are the same as container::start
+container::instance::rebuild() {
+    # Parameters are the same as container::instance::start
     eval "$(arguments::formatter "$@")"
 
     local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
 
-    container::stop instance="${_instance_name}"
-    container::cleanup instance="${_instance_name}"
-    container::start "$@"
+    container::instance::stop instance="${_instance_name}"
+    container::instance::cleanup instance="${_instance_name}"
+    container::instance::start "$@"
+}
+
+container::instance::console() {
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+
+    while read _container_id
+    do
+        logging::warning "Connecting to instance ${_instance_name} as ${_container_id}"
+        container::instance::invoke exec -i -t "${_container_id}" /bin/bash <&2 >&2
+        return $?
+    done <<< "$(container::instance::get_instance_id instance="${_instance_name}" status="running")"
+
+    logging::error "Instance '${_instance_name}' isn't running"
+    return 255
 }
