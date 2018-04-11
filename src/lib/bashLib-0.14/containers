@@ -1,0 +1,211 @@
+#! /usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+. "${local_path}/arguments"
+
+container::invoke() {
+    sudo -A docker "$@"
+}
+
+container::get_instance_id() {
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+    local _status="${kwargs["status"]:-${args[1]}}"
+
+    {
+        if [ -n "${_status}" ]
+        then
+            container::invoke ps -a --filter "name=${_instance_name}" --filter "status=${_status}" |
+            awk '{if (NR == 2) {print $1;}}'
+        else
+            container::invoke ps -a --filter "name=${_instance_name}" |
+            awk '{if (NR > 1) {print $1;}}'
+        fi
+    } | sed -e '/^[ ]*$/d'
+}
+
+container::image() {
+    eval "$(arguments::formatter "$@")"
+
+    local _image="${kwargs["image"]:-${args[0]:?Provide a container image}}" ### <image>[:<tag>] ###
+    local _tag="${kwargs["tag"]:-${args[1]:-"-latest"}}"
+
+    local _matches="$(
+        container::invoke images "${_image}" |
+        awk '{if ($2 == tag) {print $0;}}' tag="${_tag}" |
+        wc -l
+    )"
+
+    if [ ${_matches} -gt 0 ]
+    then
+        logging::info "Image ${_label} tagged ${_tag} is present"
+        return 0
+    fi
+
+    logging::warning "Importing image ${_image} tag ${_tag}"
+    container::invoke pull "${_image}:${_tag}"
+}
+
+container::start() {
+    # arguments: <group name> <base image> <service instance name> [<startup_script> [<installation_script>]]
+
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+    local _image="${kwargs["image"]:-${args[1]:?Provide a container image}}" ### <image>[:<tag>] ###
+    local _tag="${kwargs["tag"]:-${args[2]:-latest}}"
+    local _startup_script="${kwargs["startup"]}"
+    local _install_script="${kwargs["install"]}"
+    local _privileged= # --privileged
+
+    #------------------------------------
+    # Detect running instance
+    #------------------------------------
+    local _container_id="$(container::get_instance_id instance="${_instance_name}" status="running")"
+
+    if [ -n "${_container_id}" ]
+    then
+        logging::info "${_instance_name} is already running"
+        echo "${_instance_name}"
+        return 0
+    fi
+
+    #------------------------------------
+    # (re)start stopped instance
+    #------------------------------------
+    local _container_id="$(container::get_instance_id instance="${_instance_name}" status="exited")"
+
+    if [ -n "${_container_id}" ]
+    then
+        logging::warning "Restarting stopped service instance(s) ${_instance_name}"
+
+        if container::invoke start "${_container_id}"
+        then
+            echo "${_instance_name}"
+            return 0
+        fi
+    fi
+
+    #------------------------------------
+    # Create new instance from base image
+    #------------------------------------
+    logging::warning "Cleaning up previous service instance(s) of ${_instance_name}"
+
+    # Cleanup all prexisting containers
+    container::cleanup instance="${_instance_name}"
+
+    local _temp_folder="$(mktemp -d)"
+
+    # Prep default startup and installer scripts
+    {
+        (echo "#! /usr/bin/env bash"; echo true) |
+        tee "${_temp_folder}/startup" |
+        tee "${_temp_folder}/install"
+    } >/dev/null
+
+    # Prep startup script
+    if [ -n "${_startup_script}" -a -e "${_startup_script}" ]
+    then
+        cp "${_startup_script}" "${_temp_folder}/startup"
+    fi
+
+    # Prep installation script
+    if [ -n "${_install_script}" -a -e "${_install_script}" ]
+    then
+        cp "${_install_script}" "${_temp_folder}/install"
+    fi
+
+    chmod 755 "${_temp_folder}/install" "${_temp_folder}/startup"
+
+    for ((i=0; i < 2; ++i)) {
+        # Try and 'boot' from a prepared image
+
+        container::invoke run \
+            --name="${_instance_name}" \
+            ${_privileged} \
+            --detach \
+            --volume="${_temp_folder}:/mnt/boot" \
+            "${_instance_name}" \
+            /bin/bash -cx "/mnt/boot/startup && exec sleep 86400"
+
+        if [ $? = 0 ]
+        then
+            logging::info "Started instance '${_instance_name}'"
+            echo "${_instance_name}"
+            return 0
+        fi
+
+        logging::warning "Configuring new image for instance '${_instance_name}'"
+
+        # No image exists, so 'install' from the base image
+        container::image "${_image}:${_tag}"
+
+        local _uuid="$(uuidgen)" # Temporary name for the image build container
+
+        # Create a new container and initialize/install components and wait while it runs
+        container::invoke run \
+            --name="${_uuid}" \
+            ${_privileged} \
+            --volume="${_temp_folder}:/mnt/boot" \
+            "${_image}:${_tag}" \
+            /bin/sh -c '/mnt/boot/install'
+
+        logging::warning "Install status = $?"
+
+        # Commit our new image
+        container::invoke commit \
+            "${_uuid}" \
+            "${_instance_name}"
+
+        container::invoke rm "${_uuid}"
+    }
+
+    logging::warning "Couldn't create or start ${_instance_name}"
+    return 255
+}
+
+container::stop() {
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+    local _container_id=
+
+    container::get_instance_id instance="${_instance_name}" status="running" | while read _container_id
+    do
+        logging::warning "Stopping instance ${_instance_name} as ${_container_id}"
+        container::invoke kill "${_container_id}"
+    done
+}
+
+container::cleanup() {
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+    local _container_id
+
+    container::stop instance="${_instance_name}"
+
+    container::get_instance_id instance="${_instance_name}" | while read _container_id
+    do
+        logging::warning "Removing instance ${_instance_name} as ${_container_id}"
+        container::invoke rm "${_container_id}"
+    done
+
+    container::invoke rmi "${_instance_name}"
+}
+
+container::rebuild() {
+    # Parameters are the same as container::start
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+
+    container::stop instance="${_instance_name}"
+    container::cleanup instance="${_instance_name}"
+    container::start "$@"
+}
