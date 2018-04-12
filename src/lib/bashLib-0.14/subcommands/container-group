@@ -20,6 +20,10 @@ showhelp() {
 
     local -A _keywords=(
         [groups]="Produce a list of known service groups"
+        [group]="Select a specific group"
+        [start]="Start instances for the specified group"
+        [stop]="Stop instances for the specified group"
+        [instances]="Produce a list of instances for a known service group"
         [version]="Produce the version string"
         [help]="Display instructions"
     )
@@ -55,7 +59,7 @@ showhelp() {
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,groups"
+long_options="help,version,debug,info,warning,error,fatal,groups,group:,instances,start,stop"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -96,6 +100,22 @@ do
 
         --groups)
             container::group::groups
+            exit $?
+            ;;
+
+        --start)
+            container::group::start group="${selected_group}"
+            shift
+            ;;
+
+        --stop)
+            container::group::stop group="${selected_group}"
+            shift
+            ;;
+
+        --instances)
+            container::group::instances group="${selected_group}" |
+            tabular::apply 'echo "${_column_service}"' "$(container::instance::separator)"
             exit $?
             ;;
 

@@ -25,22 +25,25 @@ container::group::grouped_containers() {
     }
 
     formatter() {
-        if [ "${_column_name}" != "${_column_name/${_group_sep}}" ]
+        # Check to see if separator pattern exists in instance name
+        if [ "${_column_name}" = "${_column_name/${_group_sep}}" ]
         then
-            {
-                local _group="${_column_name/${_group_sep}*}"
-                local _suffix="${_column_name/*${_group_sep}}"
-                local _service="${_suffix/:*}"
-                local _tag="${_suffix/*:}"
-
-                echo "${_column_id}"
-                echo "${_column_name}"
-                echo "${_group}"
-                echo "${_service}"
-                echo "${_tag}"
-                echo "${_column_state}" | tr '[A-Z]' '[a-z]'
-            } | tabular::transpose "${_sep}"
+            return 0
         fi
+
+        {
+            local _group="${_column_name/${_group_sep}*}"
+            local _suffix="${_column_name/*${_group_sep}}"
+            local _service="${_suffix/:*}"
+            local _tag="${_suffix/*:}"
+
+            echo "${_column_id}"
+            echo "${_column_name}"
+            echo "${_group}"
+            echo "${_service}"
+            echo "${_tag}"
+            echo "${_column_state}" | tr '[A-Z]' '[a-z]'
+        } | tabular::transpose "${_sep}"
     }
 
     local _group_sep="$(container::group::separator)"
@@ -59,7 +62,7 @@ container::group::groups() {
     sort -u
 }
 
-container::group::container_group() {
+container::group::instances() {
     eval "$(arguments::formatter "$@")"
 
     local _group_name="${kwargs["group"]:-${args[0]:?Provide a group name}}"
@@ -78,7 +81,7 @@ container::group::format_instance_name() {
     {
         echo "${_group_name}"
         echo "${_service_name}"
-    } | tabular::transpose "$(container::group::_separator)"
+    } | tabular::transpose "$(container::group::separator)"
 }
 
 container::group::start_instance() {
@@ -116,4 +119,46 @@ container::group::stop_instance() {
     )"
 
     container::instance::stop instance="${_instance_name}"
+}
+
+container::group::start() {
+    eval "$(arguments::formatter "$@")"
+
+    local _group_name="${kwargs["group"]:-${args[0]:?Provide a group name}}"
+    local _sep="$(container::instance::separator)"
+    local _instance_name
+    local _service_name
+
+    # Unordered start sequence !!!
+    while read _service_name && test -n "${_service_name}"
+    do
+        _instance_name="$(
+            container::group::format_instance_name group="${_group_name}" service="${_service_name}"
+        )"
+
+        container::instance::start instance="${_instance_name}"
+    done <<< "$(
+        container::group::instances group="${_group_name}" |
+        tabular::apply 'echo "${_column_service}"' "${_sep}"
+    )"
+}
+
+container::group::stop() {
+    eval "$(arguments::formatter "$@")"
+
+    local _group_name="${kwargs["group"]:-${args[0]:?Provide a group name}}"
+    local _sep="$(container::instance::separator)"
+    local _instance_name
+
+    while read _service_name && test -n "${_service_name}"
+    do
+        _instance_name="$(
+            container::group::format_instance_name group="${_group_name}" service="${_service_name}"
+        )"
+
+        container::instance::stop instance="${_instance_name}"
+    done <<< "$(
+        container::group::instances group="${_group_name}" |
+        tabular::apply 'echo "${_column_service}"' "${_sep}"
+    )"
 }
