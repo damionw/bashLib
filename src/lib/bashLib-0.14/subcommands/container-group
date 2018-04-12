@@ -82,6 +82,11 @@ selected_group=Default
 while true
 do
     case "$1" in
+        --start|--stop)
+            action="$(echo "${1}" | sed -e 's/^[-]*//g')"
+            shift
+            ;;
+
         --debug|--info|--warning|--error|--fatal)
             logging::set_severity "$(echo "${1}" | sed -e 's/^[\-]*//g')"
             shift
@@ -102,16 +107,6 @@ do
         --groups)
             container::group::groups
             exit $?
-            ;;
-
-        --start)
-            container::group::start group="${selected_group}"
-            shift
-            ;;
-
-        --stop)
-            container::group::stop group="${selected_group}"
-            shift
             ;;
 
         --status)
@@ -142,3 +137,20 @@ do
             ;;
     esac
 done
+
+#===================================================================================
+#                             Perform selected action
+#===================================================================================
+case "${action}" in
+    start)
+        container::group::start group="${selected_group}"
+        ;;
+
+    stop)
+        container::group::stop group="${selected_group}"
+        ;;
+
+    *)
+        logging::fatal "Unknown or invalid action '${action}'"
+        ;;
+esac

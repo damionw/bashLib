@@ -62,7 +62,7 @@ showhelp() {
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,start,stop,rebuild,cleanup,status,instance:,name:,image:,tag:,console"
+long_options="help,version,debug,info,warning,error,fatal,start,stop,rebuild,cleanup,status,instance:,name:,image:,tag:,console,save"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -92,7 +92,7 @@ do
             shift
             ;;
 
-        --start|--stop|--rebuild|--cleanup|--status|--console)
+        --start|--stop|--rebuild|--cleanup|--status|--console|--commit)
             action="$(echo "${1}" | sed -e 's/^[-]*//g')"
             shift
             ;;
@@ -133,6 +133,11 @@ done
 #                             Perform selected action
 #===================================================================================
 case "${action}" in
+    commit)
+        container::instance::save_image instance="${instance_name}" image="${image}" tag="${tag}"
+        exit $?
+        ;;
+
     start)
         container::instance::start instance="${instance_name}" image="${image}" tag="${tag}"
         exit $?

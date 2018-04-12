@@ -65,7 +65,7 @@ container::instance::get_instance_id() {
     tabular::apply 'echo ${_column_id}' "$(container::instance::separator)"
 }
 
-container::instance::image() {
+container::instance::fetch_image() {
     eval "$(arguments::formatter "$@")"
 
     local _image="${kwargs["image"]:-${args[0]:?Provide a container image}}"
@@ -85,6 +85,22 @@ container::instance::image() {
 
     logging::warning "Importing image ${_image} tag ${_tag}"
     container::instance::invoke pull "${_image}:${_tag}"
+}
+
+}
+
+container::instance::save_image() {
+    eval "$(arguments::formatter "$@")"
+
+    local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
+    local _image="${kwargs["image"]:-${args[1]:?Provide a container image}}"
+    local _tag="${kwargs["tag"]:-${args[2]:-"-latest"}}"
+
+    container::instance::invoke commit \
+        --author="${USER}" \
+        --pause=true \
+        "${_instance_name}" \
+        "${_image}:${_tag}"
 }
 
 container::instance::start() {
@@ -139,7 +155,7 @@ container::instance::start() {
 
     # Prep default startup and installer scripts
     {
-        (echo "#! /usr/bin/env bash"; echo true) |
+        (echo "#!/usr/bin/env bash"; echo true) |
         tee "${_temp_folder}/startup" |
         tee "${_temp_folder}/install"
     } >/dev/null
@@ -179,7 +195,7 @@ container::instance::start() {
         logging::warning "Configuring new image for instance '${_instance_name}'"
 
         # No image exists, so 'install' from the base image
-        container::instance::image "${_image}:${_tag}"
+        container::instance::fetch_image "${_image}:${_tag}"
 
         local _uuid="$(uuidgen)" # Temporary name for the image build container
 
