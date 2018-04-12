@@ -211,7 +211,7 @@ container::instance::stop() {
     local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
     local _container_id=
 
-    while read _container_id
+    while read _container_id && test -n "${_container_id}"
     do
         logging::warning "Stopping instance ${_instance_name} as ${_container_id}"
         container::instance::invoke kill "${_container_id}"
@@ -226,7 +226,7 @@ container::instance::cleanup() {
 
     container::instance::stop instance="${_instance_name}"
 
-    while read _container_id
+    while read _container_id && test -n "${_container_id}"
     do
         logging::warning "Removing instance ${_instance_name} as ${_container_id}"
         container::instance::invoke rm "${_container_id}"
@@ -251,7 +251,7 @@ container::instance::console() {
 
     local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
 
-    while read _container_id
+    while read _container_id && test -n "${_container_id}"
     do
         logging::warning "Connecting to instance ${_instance_name} as ${_container_id}"
         container::instance::invoke exec -i -t "${_container_id}" /bin/bash <&2 >&2
