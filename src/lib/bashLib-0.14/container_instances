@@ -87,19 +87,20 @@ container::instance::fetch_image() {
     container::instance::invoke pull "${_image}:${_tag}"
 }
 
-}
-
 container::instance::save_image() {
     eval "$(arguments::formatter "$@")"
 
     local _instance_name="${kwargs["instance"]:-${args[0]:?Provide an instance name}}"
     local _image="${kwargs["image"]:-${args[1]:?Provide a container image}}"
     local _tag="${kwargs["tag"]:-${args[2]:-"-latest"}}"
+    local _container_id="$(
+        container::instance::get_instance_id instance="${_instance_name}"
+    )"
 
     container::instance::invoke commit \
         --author="${USER}" \
         --pause=true \
-        "${_instance_name}" \
+        "${_container_id}" \
         "${_image}:${_tag}"
 }
 

@@ -26,6 +26,7 @@ showhelp() {
         [cleanup]="Delete a container"
         [instance:]="Specify a container instance"
         [image:]="Specify an image name"
+        [commit]="Save a container instance as an image"
         [tag:]="Specify an image tag (default: latest)"
         [version]="Produce the version string"
         [help]="Display instructions"
@@ -62,7 +63,7 @@ showhelp() {
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,start,stop,rebuild,cleanup,status,instance:,name:,image:,tag:,console,save"
+long_options="help,version,debug,info,warning,error,fatal,start,stop,rebuild,cleanup,status,instance:,name:,image:,tag:,console,commit"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -150,6 +151,11 @@ case "${action}" in
 
     status)
         container::instance::instances instance="${instance_name}"
+        exit $?
+        ;;
+
+    cleanup)
+        container::instance::cleanup instance="${instance_name}"
         exit $?
         ;;
 
