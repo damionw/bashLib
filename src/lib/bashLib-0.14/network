@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#! /usr/bin/env bash
 
 first_name="${BASH_SOURCE[0]}"
 actual_name="$(readlink -f "${first_name}")"
@@ -6,164 +6,48 @@ local_path="$(dirname "${actual_name}")"
 
 . "${local_path}/logging"
 . "${local_path}/arguments"
-. "${local_path}/tabular"
 
-export BASHLIB_NETWORK_SERVICES_LIST="${BASHLIB_NETWORK_SERVICES_LIST:-"/var/tmp/bashlib/${USER}/network_services.csv"}"
+export BASHLIB_NETWORK_REGISTRY="${BASHLIB_NETWORK_REGISTRY:-/var/tmp/${USER}/network-service-ports.csv}"
 
 network::services() {
     network::services::list
 }
 
-network::services::path() {
+network::services::registry() {
     if [ -n "${1}" ]
     then
-        export BASHLIB_NETWORK_SERVICES_LIST="${1}"
-    elif [ -z "${BASHLIB_NETWORK_SERVICES_LIST}" ]
+        export BASHLIB_NETWORK_REGISTRY="${1}"
+    elif [ -z "${BASHLIB_NETWORK_REGISTRY}" ]
     then
-        logging::error "No services list file has been selected"
+        logging::error "No network registry has been chosen"
         return 255
     else
-        echo "${BASHLIB_NETWORK_SERVICES_LIST}"
+        echo "${BASHLIB_NETWORK_REGISTRY}"
     fi
-}
-
-network::services::separator() {
-    echo ","
 }
 
 network::services::list() {
-    local _sep="$(network::services::separator)"
-    local _path
-    local _
+    local _registry=
 
-    if ! _path="$(network::services::path)"
+    if ! _registry="$(network::services::registry)"
     then
         return 255
-    elif ! (test -d "$(dirname "${_path}")" || mkdir -p "$(dirname "${_path}")")
+    fi
+
+    local _folder="$(dirname "${_registry}")"
+
+    if [ -z "${_folder}" ]
     then
-        logging::error "No folder '$(dirname "${_path}")'"
+        logging::error "Invalid folder '${_folder}'"
         return 255
-    elif [ -f "${_path}" ]
+    elif [ -d "${_folder}" ] || mkdir -p "${_folder}" ]
     then
-        cat "${_path}"
+        :
     else
-        echo "Service${_sep}Port"
-    fi
-}
-
-network::services::registration() {
-    eval "$(arguments::formatter "$@")"
-
-    local _sep="$(network::services::separator)"
-    local _service="${kwargs["service"]:-${args[0]}}"
-
-    if [ -z "${_service}" ]
-    then
-        logging::error "No service name specified"
+        logging::error "Cannot access folder '${_folder}'"
         return 255
     fi
 
-    local _port="$(
-        network::services::list |
-        tabular::filter '[ "${_column_service}" = "'"${_service}"'" ]'  "${_sep}" |
-        tabular::apply 'echo "${_column_port}"' "${_sep}" |
-        head -1
-    )"
-
-    # If there's an allocated port, return it
-    if [ -n "${_port}" ]
-    then
-        echo "${_port}"
-        return 0
-    fi
-
-    if ! _port="$(network::services::unused_port)"
-    then
-        logging::error "Cannot allocate port for service '${_service}'"
-        return 255
-    fi
-
-    local _path
-
-    if ! _path="$(network::services::path)"
-    then
-        return 255
-    fi
-
-    logging::warning "Allocating new port '${_port}' for service '${_service}'"
-
-    local _contents="$(
-        network::services::list
-        echo "${_service}${_sep}${_port}"
-    )"
-
-    # Record the updated service list
-    echo "${_contents}" > "${_path}"
-
-    # Return the newly allocated port
-    echo "${_port}"
+    if [ ! -f "${_registry}" 
+    cat
 }
-
-network::services::deregister() {
-    eval "$(arguments::formatter "$@")"
-
-    local _sep="$(network::services::separator)"
-    local _service="${kwargs["service"]:-${args[0]}}"
-
-    if [ -z "${_service}" ]
-    then
-        logging::error "No service name specified"
-        return 255
-    fi
-
-    local _path
-
-    if ! _path="$(network::services::path)"
-    then
-        return 255
-    fi
-
-    # Filter out the service
-    local _contents="$(
-        network::services::list | tabular::filter '[ "${_column_service}" != "'"${_service}"'" ]' "${_sep}"
-    )"
-
-    # Record the updated service list
-    echo "${_contents}" > "${_path}"
-}
-
-network::services::available_ports() {
-    eval "$(arguments::formatter "$@")"
-
-    local start_port="${kwargs["start"]:-${args[0]:-10000}}"
-    local protocol="${kwargs["protocol"]:-${args[1]:-tcp}}"
-    local stop_port="${kwargs["stop"]:-${args[2]:-11000}}"
-
-    address_family=$(echo ${protocol}4 | sed -e 's/^[^0-9]*//g' | dd bs=1 count=1 2>/dev/null)
-    protocol=$(echo ${protocol} | sed -e 's/[0-9].*$//g')
-
-    netstat -ln --${protocol} -${address_family} |
-    awk '{print $4;}' |
-    awk -F: '{print $2;}' | {
-        sed -e '/^[ ]*$/d'
-        network::services::list | tabular::apply 'echo "${_column_port}"' "${_sep}" # Disallow allocated (but unused) ports
-    } |
-    sort -un |
-    awk '{
-        for (; i < $1 && i <= limit; ++i)
-        {
-            print i;
-        }
-
-        if (i == $1)
-        {
-            ++i;
-        }
-    }' i=${start_port} limit=${stop_port}
-}
-
-network::services::unused_port() {
-    network::services::available_ports start=12000 stop=13000 "$@" | (read row && echo $row)
-}
-
-#===================================================================================
