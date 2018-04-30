@@ -111,13 +111,13 @@ url::simple_request() {
         "${_type}" \
         "${_content}" \
         "${_http_username}" \
-        "${_http_password}" \
+        "${_http_password}"
 }
 
 url::simple_request_positional() {
     local _url="${1:?'Needs a URL'}"
-    local _type="${2:-GET}}"
-    local _content="${3:-'{}'}}"
+    local _type="${2:-GET}"
+    local _content="${3:-'{}'}"
     local _http_username="${4:-}" # Allow default via parameters
     local _http_password="${5:-}" # Allow default via parameters
 
