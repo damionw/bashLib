@@ -106,6 +106,21 @@ url::simple_request() {
     local _http_username="${kwargs["default_username"]:-}" # Allow default via parameters
     local _http_password="${kwargs["default_password"]:-}" # Allow default via parameters
 
+    url::simple_request_positional \
+        "${_url}" \
+        "${_type}" \
+        "${_content}" \
+        "${_http_username}" \
+        "${_http_password}" \
+}
+
+url::simple_request_positional() {
+    local _url="${1:?'Needs a URL'}"
+    local _type="${2:-GET}}"
+    local _content="${3:-'{}'}}"
+    local _http_username="${4:-}" # Allow default via parameters
+    local _http_password="${5:-}" # Allow default via parameters
+
     eval "$(url::urlshell "${_url}")"
 
     # Reconstruct URL without auth info
