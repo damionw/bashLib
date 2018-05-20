@@ -31,7 +31,7 @@ showhelp() {
         [help]="Display instructions"
     )
 
-    local _terms="$(echo "${@}" | awk -F, '{for (i=1; i <= NF; ++i) {print $i;}}')"
+    local _terms="$(echo "${@}" | awk -F, '{for (i=1; i <= NF; ++i) {print $i;}}' | sed -e 's/[\:]*$//g')"
     local _topic
 
     local _contents="$(
