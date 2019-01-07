@@ -12,6 +12,13 @@ modules::install() {
 
 modules::install::repo_type() {
     local _url="${1?Need to provide a GIT url}"
+    local _prefix="$(echo "${_url}" | sed -e 's/[\:].*$//g' | tr '[A-Z]' '[a-z]')"
+
+    if [ "${_prefix}" = "pip" ]
+    then
+        echo pip
+        return
+    fi
 
     if GIT_ASKPASS="/bin/true" git ls-remote "${_url}" >/dev/null 2>&1
     then
@@ -64,7 +71,18 @@ modules::install::install() {
                 return 253
             fi
             ;;
-            
+
+        pip)
+            local _pypi_package="$(echo "${_url}" | sed -e 's/^pip[\:]//g')"
+
+            if ! pip install "${_pypi_package}"
+            then
+                logging::error "Failed to install python package '${_pypi_package}'"
+                cleanup 0
+                return 252
+            fi
+            ;;
+
         *)
             logging::error "Unknown repo type ${_url}"
             cleanup 0
