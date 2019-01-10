@@ -101,7 +101,7 @@ do
 
         --install|--git)
             logging::warning "Installing module '${2}' in '$(virtualenv::path)'"
-            modules::install::git "${2}"
+            modules::install "${2}"
             shift 2
             ;;
 
