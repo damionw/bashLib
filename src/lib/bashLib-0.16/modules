@@ -50,7 +50,7 @@ modules::install::extract_temp() {
 
     case "${_mode}" in
         hg)
-            if ! hg clone "${_url}" "${_tempdir}" --branch="${_branch:-default}" >/dev/null 2>&1
+            if ! (cd "${_tempdir}" && hg clone "${_url}" --branch="${_branch:-default}" >/dev/null 2>&1)
             then
                 logging::error "Failed to checkout repo '${_url}' with branch ${_branch:-default}"
                 rm -rf "${_tempdir}"
@@ -59,7 +59,7 @@ modules::install::extract_temp() {
             ;;
 
         git)
-            if ! git clone "${_url}" "${_tempdir}" --branch="${_branch:-master}" >/dev/null 2>&1
+            if ! (cd "${_tempdir}" && git clone "${_url}" --branch="${_branch:-master}" >/dev/null 2>&1)
             then
                 logging::error "Failed to checkout repo '${_url}' with branch ${_branch:-master}"
                 rm -rf "${_tempdir}"
@@ -90,12 +90,6 @@ modules::install::extract_temp() {
 }
 
 modules::install::install() {
-    cleanup() {
-        local _level="${1:-0}"
-        [ "${_level}" -gt 0 ] && popd >/dev/null 2>&1
-        [ -n "${_tempdir}" ] && rm -rf "${_tempdir}"
-    }
-
     local _url="${1?Need to provide a url}"
     local _branch="${2}"
     local _tempdir
@@ -114,7 +108,7 @@ modules::install::install() {
     then
         logging::error "No temporary folder was created"
         return 255
-    elif ! pushd "${_tempdir}" >/dev/null 2>&1
+    elif ! pushd "${_tempdir}/*" >/dev/null 2>&1
     then
         logging::error "Couldn't use temporary folder '${_tempdir}'"
         rm -rf "${_tempdir}"
