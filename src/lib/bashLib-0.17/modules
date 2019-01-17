@@ -108,7 +108,7 @@ modules::install::install() {
     then
         logging::error "No temporary folder was created"
         return 255
-    elif ! pushd "${_tempdir}/*" >/dev/null 2>&1
+    elif ! pushd "${_tempdir}"/* >/dev/null 2>&1
     then
         logging::error "Couldn't use temporary folder '${_tempdir}'"
         rm -rf "${_tempdir}"
