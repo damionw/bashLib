@@ -21,7 +21,7 @@ virtualenv::create() {
     if [ -d "${_env}" ]
     then
         logging::warning "Using existing virtual environment in '${_env}'"
-    elif "$(virtualenv::python)" -m venv --system-site-packages "${_env}" 2>/dev/null
+    elif "$(virtualenv::python)" -m venv "${_env}" 2>/dev/null
     then
         logging::warning "Created virtual environment in '${_env}'"
     elif virtualenv "${_env}" --system-site-packages 2>/dev/null
