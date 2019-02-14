@@ -45,7 +45,7 @@ logging::format() {
 
     if (logging::get_levels | grep -q '^'"${_mode}"'$')
     then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') [$(echo "${_mode}" | tr '[a-z]' '[A-Z]')] (${_pid}): $@" >&2
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [$(echo "${_mode}" | tr '[a-z]' '[A-Z]')] <${_pid}>: $@" >&2
     fi
 
     return ${_retval}
