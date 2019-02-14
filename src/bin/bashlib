@@ -24,6 +24,11 @@ showhelp() {
     "
 
     local -A _keywords=(
+        [debug]="Expose debug level logging"
+        [info]="Expose normal level logging"
+        [warning]="Expose error level logging"
+        [error]="Expose error level logging"
+        [fatal]="Expose fatal error level logging"
         [env]="Provide the current virtualenv path (if any)"
         [lib]="Provide the library module import file"
         [version]="Produce the library's version string"
@@ -36,7 +41,7 @@ showhelp() {
 
     local _contents="$(
         echo "${_terms}" | awk -F: '{printf("%s[--%s%s]", sep, $1, (NF == 2 ? sprintf("=<%s>", $1) : "")); sep=" "}'
-        echo -en "${_synopsis:+\n}"
+        echo -en "${_synopsis:+\n\n}"
         echo "${_synopsis}" | sed -e 's/^[ ]*//g' -e '/^[ ]*$/d'
 
         echo "${_terms}" | {
@@ -54,7 +59,7 @@ showhelp() {
         }
     )"
 
-    echo "Usage: $0 ${_contents}" >&2
+    echo -e "Usage: $0 ${_contents}\n" >&2
 }
 
 #===================================================================================
