@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+. "${local_path}/logging"
+
+properties::property() {
+    local _scope_name="${1}"
+    local _property_name="${2}"
+
+    if [ -z "${_scope_name}" ]
+    then
+        logging::error "No scope provided"
+        return 255
+    elif [ -z "${_property_name}" ]
+    then
+        logging::error "No property name provided"
+        return 255
+    fi
+
+    local _property_variable="__${_scope_name}__property__$(
+        echo "${_property_name}" | tr '[A-Z]' '[a-z]' | sed -e 's/[ ][ ]*/_/g' -e 's/[!\w]//g'
+    )__"
+
+    shift 2
+
+    if [ -n "${*}" ]
+    then
+        eval export "${_property_variable}=\"${*}\""
+        return 0
+    fi
+
+    eval local _current_value="\"\$${_property_variable}\""
+    
+    if [ -z "${_current_value}" ]
+    then
+        return 255
+    fi
+
+    echo "${_current_value}"
+}
+
+properties::bashlib() {
+    properties::property bashlib "$@"
+}

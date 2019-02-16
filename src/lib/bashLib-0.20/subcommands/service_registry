@@ -15,16 +15,19 @@ logging::set_severity info
 #===================================================================================
 showhelp() {
     local _synopsis="
-        Maintain grouped services
+        Maintain services list
     "
 
     local -A _keywords=(
-        [groups]="Produce a list of known service groups"
-        [group]="Select a specific group"
-        [start]="Start instances for the specified group"
-        [stop]="Stop instances for the specified group"
-        [instances]="Produce a list of instances for a known service group"
-        [status]="Produce the instance statuses for a known service group"
+        [debug]="Expose debug level logging"
+        [info]="Expose normal level logging"
+        [warning]="Expose error level logging"
+        [error]="Expose error level logging"
+        [fatal]="Expose fatal error level logging"
+        [list]="Provide the list of registered services"
+        [path]="Path for the service registry store"
+        [register]="Register a service and/or return the port"
+        [deregister]="Deregister a service"
         [version]="Produce the version string"
         [help]="Display instructions"
     )
@@ -52,7 +55,7 @@ showhelp() {
         }
     )"
 
-    echo "Usage: $0 ${_contents}" >&2
+    echo -e "Usage: $0 ${_contents}\n" >&2
 }
 
 #===================================================================================
@@ -60,7 +63,7 @@ showhelp() {
 #       will cause the first non option parameter to be discarded. Here, we just
 #       use -h (help)
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,groups,group:,instances,start,stop,status"
+long_options="help,version,debug,info,warning,error,fatal,list,path::,register:,deregister:"
 
 OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
 
@@ -77,47 +80,37 @@ eval set -- "$OPTION_TEMP"
 # NOTE: The command line parameters are available for scripts which
 #       source this file.
 #===================================================================================
-selected_group=Default
-
 while true
 do
     case "$1" in
-        --start|--stop)
-            action="$(echo "${1}" | sed -e 's/^[-]*//g')"
-            shift
-            ;;
-
         --debug|--info|--warning|--error|--fatal)
             logging::set_severity "$(echo "${1}" | sed -e 's/^[\-]*//g')"
             shift
             ;;
 
-        --group)
+        --path)
             if [ -z "${2}" ]
             then
-                echo "${selected_group}"
-                exit 0
+                network::services::path
             else
-                selected_group="${2}"
+                network::services::path "${2}"
             fi
 
             shift 2
             ;;
 
-        --groups)
-            container::group::groups
+        --register)
+            network::services::registration service="${2}"
             exit $?
             ;;
 
-        --status)
-            container::group::instances group="${selected_group}" |
-            tabular::apply 'echo "${_column_id},${_column_state},${_column_service}"' "$(container::instance::separator)"
+        --deregister)
+            network::services::deregister service="${2}"
             exit $?
             ;;
 
-        --instances)
-            container::group::instances group="${selected_group}" |
-            tabular::apply 'echo "${_column_service}"' "$(container::instance::separator)"
+        --list)
+            network::services
             exit $?
             ;;
 
@@ -137,20 +130,3 @@ do
             ;;
     esac
 done
-
-#===================================================================================
-#                             Perform selected action
-#===================================================================================
-case "${action}" in
-    start)
-        container::group::start group="${selected_group}"
-        ;;
-
-    stop)
-        container::group::stop group="${selected_group}"
-        ;;
-
-    *)
-        logging::fatal "Unknown or invalid action '${action}'"
-        ;;
-esac

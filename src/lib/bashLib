@@ -28,6 +28,7 @@ export BASHLIB_SUBCOMMANDS_PATH="${lib_path}/subcommands"
 . "${lib_path}/network"
 . "${lib_path}/list"
 . "${lib_path}/url"
+. "${lib_path}/properties"
 
 bashlib::version() {
     echo "${BASHLIB_VERSION}"
