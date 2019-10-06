@@ -7,8 +7,9 @@ local_path="$(dirname "${actual_name}")"
 . "${local_path}/logging"
 
 virtualenv::python() {
-    # Prefer Python3 wherever possible
-    which python3 || which python
+    # Prefer Python3 wherever possible, but only from within a virtualenv
+    PATH="$VIRTUAL_ENV/bin" /usr/bin/which python3 ||
+    PATH="$VIRTUAL_ENV/bin" /usr/bin/which python
 }
 
 virtualenv::path() {
