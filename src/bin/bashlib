@@ -16,53 +16,6 @@ library_import_file="$(readlink -f "${local_path}/../lib/bashLib")"
 logging::set_severity info
 
 #===================================================================================
-#                              Help Message
-#===================================================================================
-showhelp() {
-    local _synopsis="
-        Provide information about the bashlib module
-    "
-
-    local -A _keywords=(
-        [debug]="Expose debug level logging"
-        [info]="Expose normal level logging"
-        [warning]="Expose error level logging"
-        [error]="Expose error level logging"
-        [fatal]="Expose fatal error level logging"
-        [env]="Provide the current virtualenv path (if any)"
-        [lib]="Provide the library module import file"
-        [version]="Produce the library's version string"
-        [commands]="List available subcommands"
-        [help]="Display instructions"
-    )
-
-    local _terms="$(echo "${@}" | awk -F, '{for (i=1; i <= NF; ++i) {print $i;}}' | sed -e 's/[\:]*$//g')"
-    local _topic
-
-    local _contents="$(
-        echo "${_terms}" | awk -F: '{printf("%s[--%s%s]", sep, $1, (NF == 2 ? sprintf("=<%s>", $1) : "")); sep=" "}'
-        echo -en "${_synopsis:+\n\n}"
-        echo "${_synopsis}" | sed -e 's/^[ ]*//g' -e '/^[ ]*$/d'
-
-        echo "${_terms}" | {
-            _prefix="\n"
-
-            while read _topic
-            do
-                if [ -n "${_keywords["${_topic}"]}" ]
-                then
-                    _fill="$(for ((i=$(echo -n "${_topic}" | wc -c); i < 15; ++i)); do echo -n " "; done)"
-                    echo -e "${_prefix}--${_topic}${_fill}${_keywords["${_topic}"]}" | sed -e 's/^./    &/g'
-                    _prefix=""
-                fi
-            done
-        }
-    )"
-
-    echo -e "Usage: $0 ${_contents}\n" >&2
-}
-
-#===================================================================================
 #                       Break out if we're running a subcommand
 #===================================================================================
 if [ "$(echo "$1" | head -c1)" != "-" ] && _path="$(bashlib::subcommands::path)" && _command="${_path}/$1"
@@ -72,68 +25,35 @@ then
 fi
 
 #===================================================================================
-# NOTE: There is a bug in getopts where not specifying at least one short option
-#       will cause the first non option parameter to be discarded. Here, we just
-#       use -h (help)
+#                           Command line option handlers
 #===================================================================================
-long_options="help,version,debug,info,warning,error,fatal,lib,env,commands"
+set_logging() {
+    logging::set_severity "$(echo "${1}" | sed -e 's/^[\-]*//g')"
+}
 
-OPTION_TEMP=$(getopt -a -o hv --long ${long_options} -- "$@")
+show_library_path() {
+    echo "${library_import_file}"
+}
 
-if [ $? != 0 ]
+#===================================================================================
+#                           Process command line options
+#===================================================================================
+optionslib::parse::description "Provide information about the bashlib module"
+
+optionslib::parse::config "
+    long_options=--help short_options=-h action=command name=show_help description='Display instructions'
+    long_options=--debug action=command name=set_logging description='Expose debug level logging'
+    long_options=--info action=command name=set_logging  description='Expose normal level logging'
+    long_options=--warning action=command name=set_logging  description='Expose error level logging'
+    long_options=--error action=command name=set_logging  description='Expose error level logging'
+    long_options=--fatal action=command name=set_logging  description='Expose fatal error level logging'
+    long_options=--env action=command name=virtualenv::path description='Provide the current virtualenv path (if any)'
+    long_options=--lib action=command name=show_library_path description='Provide the library module import file'
+    long_options=--version short_options=-v action=command name=bashlib::version description='Produce the library version string'
+    long_options=--commands action=command name=bashlib::subcommands description='List available subcommands'
+"
+
+if ! optionslib::parse::parse_arguments "$@"
 then
-    logging::fatal "Invalid command line options ${OPTION_TEMP}"
+    exit 255
 fi
-
-eval set -- "$OPTION_TEMP"
-
-#===================================================================================
-#                       Process command line parameters
-#
-# NOTE: The command line parameters are available for scripts which
-#       source this file.
-#===================================================================================
-while true
-do
-    case "$1" in
-        --debug|--info|--warning|--error|--fatal)
-            logging::set_severity "$(echo "${1}" | sed -e 's/^[\-]*//g')"
-            shift
-            ;;
-
-        --commands)
-            bashlib::subcommands
-            shift
-            exit $?
-            ;;
-
-        --lib)
-            echo "${library_import_file}"
-            shift
-            exit 0
-            ;;
-
-        --version)
-            bashlib::version
-            shift
-            exit 0
-            ;;
-
-        --env)
-            virtualenv::path
-            shift
-            exit 0
-            ;;
-
-        --)
-            shift
-            break
-            ;;
-
-        *)
-            showhelp "${long_options}" >&2
-            exit 0
-            ;;
-    esac
-done
-
