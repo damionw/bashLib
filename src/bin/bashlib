@@ -41,7 +41,7 @@ show_library_path() {
 optionslib::parse::description "Provide information about the bashlib module"
 
 optionslib::parse::config "
-    long_options=--help short_options=-h action=command name=show_help description='Display instructions'
+    long_options=--help short_options=-h action=show_help description='Display instructions'
     long_options=--debug action=command name=set_logging description='Expose debug level logging'
     long_options=--info action=command name=set_logging  description='Expose normal level logging'
     long_options=--warning action=command name=set_logging  description='Expose error level logging'
