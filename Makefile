@@ -7,10 +7,12 @@ DIR_COMPONENTS := $(foreach name, bin share lib, build/$(name)) build/share/$(PA
 
 .PHONY: tests clean help build
 
-all: build
+all: updates build
 
 help:
 	@echo "Usage: make [build|tests|all|clean|version|install]"
+
+updates: src/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION)/option_parsing
 
 build: build/lib/$(PACKAGE_NAME) $(BIN_COMPONENTS) build/share/$(PACKAGE_NAME)/examples
 
@@ -31,6 +33,18 @@ install: tests
 
 version: all
 	@build/bin/bashlib --version
+
+src/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION)/option_parsing: checkouts/optionslib/build/parse
+
+checkouts/optionslib/build/parse: checkouts/optionslib
+	@cp $</build/lib/optionslib-$(shell $</build/bin/optionslib --version)/parse $@
+
+checkouts/optionslib: checkouts
+	@git clone https://github.com/damionw/optionslib.git $@
+	@$(MAKE) -C $@ all
+
+checkouts:
+	@install -d $@
 
 build/lib/$(PACKAGE_NAME): build/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION) build/lib src/lib/$(PACKAGE_NAME)
 	@install -m 755 src/lib/$(PACKAGE_NAME) $@
