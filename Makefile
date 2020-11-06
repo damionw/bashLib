@@ -37,11 +37,12 @@ version: all
 src/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION)/option_parsing: checkouts/optionslib/build/parse
 
 checkouts/optionslib/build/parse: checkouts/optionslib
-	@cp $</build/lib/optionslib-$(shell $</build/bin/optionslib --version)/parse $@
+	@(cd $< && git pull)
+	@$(MAKE) -C $< clean all
+	@bash -c 'e=$$($</build/bin/optionslib --version); mv $</build/lib/optionslib-$$e/parse $@'
 
 checkouts/optionslib: checkouts
-	@git clone https://github.com/damionw/optionslib.git $@
-	@$(MAKE) -C $@ all
+	@git clone -q https://github.com/damionw/optionslib.git $@
 
 checkouts:
 	@install -d $@
