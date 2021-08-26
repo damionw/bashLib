@@ -35,6 +35,7 @@ version: all
 	@build/bin/bashlib --version
 
 src/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION)/option_parsing: checkouts/optionslib/build/parse
+	@cp $< $@
 
 checkouts/optionslib/build/parse: checkouts/optionslib
 	@(cd $< && git pull)
