@@ -8,7 +8,7 @@ local_path="$(dirname "${actual_name}")"
 
 virtualenv::python() {
     # Prefer Python3 wherever possible, but only from within a virtualenv
-    PATH="${VIRTUAL_ENV}/bin:${VIRTUAL_ENV}/usr/bin" /usr/bin/which python3 ||
+    PATH="${VIRTUAL_ENV}/usr/local/bin:${VIRTUAL_ENV}/bin:${VIRTUAL_ENV}/usr/bin" /usr/bin/which python3 ||
     /usr/bin/which python
 }
 
