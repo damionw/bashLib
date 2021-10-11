@@ -135,7 +135,7 @@ init_services::start_service() {
 
     init_services::stop_service
 
-    case "${init_services::service_config_scheme}" in
+    case "$(init_services::service_config_scheme)" in
         "systemd")
             systemctl daemon-reload
             systemctl enable "${_service_name}"
@@ -170,7 +170,7 @@ init_services::stop_service() {
         return $?
     fi
 
-    case "${init_services::service_config_scheme}" in
+    case "$(init_services::service_config_scheme)" in
         "systemd")
             systemctl stop "${_service_name}"
             systemctl disable "${_service_name}"
