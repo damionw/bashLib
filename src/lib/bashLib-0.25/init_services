@@ -1,0 +1,535 @@
+#!/usr/bin/env bash
+
+first_name="${BASH_SOURCE[0]}"
+actual_name="$(readlink -f "${first_name}")"
+local_path="$(dirname "${actual_name}")"
+
+#=======================================================================
+#
+#=======================================================================
+export __INIT_SERVICES_SERVICE_SCHEME__=
+export __INIT_SERVICES_SERVICE_NAME__=testing
+export __INIT_SERVICES_SERVICE_EXECUTABLE__=
+export __INIT_SERVICES_SERVICE_DESCRIPTION__=
+export __INIT_SERVICES_SERVICE_PARAMETERS__=
+
+#=======================================================================
+#
+#=======================================================================
+init_services::service_executable() {
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_EXECUTABLE__="${1}"
+    elif [ -z "${__INIT_SERVICES_SERVICE_EXECUTABLE__}" ]
+    then
+        logging::error "No service executable defined"
+        return $?
+    else
+        echo "${__INIT_SERVICES_SERVICE_EXECUTABLE__}"
+    fi
+}
+
+init_services::service_name() {
+    local _executable_name
+
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_NAME__="${1}"
+    elif [ -n "${__INIT_SERVICES_SERVICE_NAME__}" ]
+    then
+        echo "${__INIT_SERVICES_SERVICE_NAME__}"
+    elif ! _executable_name="$(init_services::service_executable)"
+    then
+        return $?
+    else
+        basename "${_executable_name}"
+    fi
+}
+
+init_services::service_description() {
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_DESCRIPTION__="$@"
+    elif [ -n "${__INIT_SERVICES_SERVICE_DESCRIPTION__}" ]
+    then
+        echo "${__INIT_SERVICES_SERVICE_DESCRIPTION__}"
+    else
+        init_services::service_name
+    fi
+}
+
+init_services::service_parameters() {
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_PARAMETERS__="$@"
+    else
+        echo "${__INIT_SERVICES_SERVICE_PARAMETERS__}"
+    fi
+}
+
+init_services::service_config_scheme() {
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_SCHEME__="${1}"
+        return
+    elif [ -n "${__INIT_SERVICES_SERVICE_SCHEME__}" ]
+    then
+        echo "${__INIT_SERVICES_SERVICE_SCHEME__}"
+    elif [ -d /lib/systemd/system ]
+    then
+        echo "systemd"
+    elif which update-rc.d >/dev/null 2>&1
+    then
+        echo "rc"
+    elif [ -d /etc/init ]
+    then
+        echo "upstart"
+    else
+        return 35
+    fi
+}
+
+#=======================================================================
+#
+#=======================================================================
+init_services::install_service() {
+    local _contents _service_path
+    
+    if ! _contents="$(init_services::service_config_details)"
+    then
+        return $?
+    elif ! _service_path="$(init_services::service_config_path)"
+    then
+        return $?
+    elif ! (echo "${_contents}" > "${_service_path}")
+    then
+        logging::error "Can't write to '${_service_path}'"
+        return $?
+    else
+        logging::warning "Wrote configuration to '${_service_path}'"
+    fi
+}
+
+init_services::remove_service() {
+    local _service_path
+    
+    if ! _service_path="$(init_services::service_config_path)"
+    then
+        return $?
+    elif ! rm "${_service_path}"
+    then
+        logging::error "Couldn't remove '${_service_path}'"
+        return $?
+    else
+        logging::warning "Removed config '${_service_path}'"
+    fi
+}
+
+init_services::start_service() {
+    local _service_name
+
+    if ! _service_name="$(init_services::service_name)"
+    then
+        return $?
+    fi
+
+    init_services::stop_service
+
+    case "${init_services::service_config_scheme}" in
+        "systemd")
+            systemctl daemon-reload
+            systemctl enable "${_service_name}"
+            systemctl daemon-reload
+            systemctl start "${_service_name}"
+            ;;
+
+        "upstart")
+            initctl start ${_service_name}
+            ;;
+
+        "rc")
+            update-rc.d ${_service_name} defaults
+            update-rc.d ${_service_name} start
+            ;;
+
+        "testing")
+            logging::warning "TEST: starting ${_service_name}"
+            ;;
+            
+        *)
+            return 88
+            ;;
+    esac
+}
+
+init_services::stop_service() {
+    local _service_name
+
+    if ! _service_name="$(init_services::service_name)"
+    then
+        return $?
+    fi
+
+    case "${init_services::service_config_scheme}" in
+        "systemd")
+            systemctl stop "${_service_name}"
+            systemctl disable "${_service_name}"
+            systemctl daemon-reload
+            ;;
+
+        "upstart")
+            initctl stop ${_service_name}
+            ;;
+
+        "rc")
+            update-rc.d ${_service_name} defaults
+            update-rc.d ${_service_name} start
+            ;;
+
+        "testing")
+            logging::warning "TEST: stopping ${_service_name}"
+            ;;
+            
+        *)
+            return 88
+            ;;
+    esac
+}
+
+#=======================================================================
+#
+#=======================================================================
+init_services::service_config_details() {
+    local _prefix="init_services::template::"
+    local _service_executable _service_name _service_description _service_parameters
+    local _config_scheme
+
+    if ! _service_executable="$(init_services::service_executable)"
+    then
+        return $?
+    elif ! _service_name="$(init_services::service_name)"
+    then
+        return $?
+    elif ! _service_description="$(init_services::service_description)"
+    then
+        return $?
+    elif ! _service_parameters="$(init_services::service_parameters)"
+    then
+        return $?
+    elif ! _config_scheme="$(init_services::service_config_scheme)"
+    then
+        return $?
+    elif [ -z "${_config_scheme}" ]
+    then
+        return $?
+    elif ! (declare -F | awk '{print $NF;}' | grep -q "^${_prefix}${_config_scheme}$")
+    then
+        logging::error "No scheme named ${_config_scheme}"
+        return $?
+    fi
+
+    "${_prefix}${_config_scheme}" | m4 \
+        -D__SERVICE_EXECUTABLE__="${_service_executable}" \
+        -D__SERVICE_PARAMETERS__="${_service_parameters}" \
+        -D__SERVICE_NAME__="${_service_executable}" \
+        -D__SERVICE_DESCRIPTION__="${_service_description}"
+}
+
+init_services::service_config_path() {
+    local _path
+    
+    if ! _path="$(init_services::service_config_folder)/$(init_services::service_config_filename)"
+    then
+        return $?
+    fi
+    
+    echo "${_path}"
+}
+
+init_services::service_config_filename() {
+    local _service_name
+    
+    if ! _service_name="$(init_services::service_name)"
+    then
+        return $?
+    elif [ -z "${_service_name}" ]
+    then
+        return $?
+    fi
+
+    case "$(init_services::service_config_scheme)" in
+        "systemd")
+            echo "${_service_name}.service"
+            ;;
+
+        "upstart")
+            echo "${_service_name}.conf"
+            ;;
+
+        "rc")
+            echo "${_service_name}"
+            ;;
+
+        "testing")
+            echo "${_service_name}-testing"
+            ;;
+            
+        *)
+            return 88
+            ;;
+    esac
+}
+
+init_services::service_config_folder() {
+    case "$(init_services::service_config_scheme)" in
+        "systemd")
+            echo "/lib/systemd/system"
+            ;;
+
+        "upstart")
+            echo "/etc/init"
+            ;;
+
+        "rc")
+            echo "/etc/init.d"
+            ;;
+
+        "testing")
+            echo "${HOME}/tmp"
+            ;;
+
+        *)
+            return 88
+            ;;
+    esac
+}
+
+#=======================================================================
+#
+#=======================================================================
+init_services::template::systemd() {
+    sed -e 's/^        //g' <<"    EOF"
+        [Unit]
+        Description=__SERVICE_DESCRIPTION__
+        Wants=network.target
+
+        [Service]
+        Type=simple
+        User=1000
+        Group=1000
+        Environment=
+        Nice=10
+        ExecStart=__SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
+        ExecStop=
+
+        [Install]
+        WantedBy=multi-user.target
+        Alias=__SERVICE_NAME__
+    EOF
+}
+
+init_services::template::upstart(){
+    sed -e 's/^        //g' <<"    EOF"
+        # __SERVICE_DESCRIPTION__
+
+        description     "__SERVICE_DESCRIPTION__"
+        author          "dkw"
+
+        start on (filesystem and runlevel [2345])
+        stop on runlevel [016]
+
+        console log
+        respawn
+        setuid 1000
+
+        script
+            /usr/bin/nice -n 10 __SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
+        end script
+
+    EOF
+}
+
+init_services::template::rc(){
+    sed -e 's/^        //g' <<"    EOF"
+        #! /bin/sh
+        ### BEGIN INIT INFO
+        # Provides:          skeleton
+        # Required-Start:    $remote_fs $syslog
+        # Required-Stop:     $remote_fs $syslog
+        # Default-Start:     2 3 4 5
+        # Default-Stop:      0 1 6
+        # Short-Description: Example initscript
+        # Description:       This file should be used to construct scripts to be
+        #                    placed in /etc/init.d.
+        ### END INIT INFO
+
+        # Author: Foo Bar <foobar@baz.org>
+        #
+        # Please remove the "Author" lines above and replace them
+        # with your own name if you copy and modify this script.
+
+        # Do NOT "set -e"
+
+        # PATH should only include /usr/* if it runs after the mountnfs.sh script
+        PATH=/sbin:/usr/sbin:/bin:/usr/bin
+        DESC="__SERVICE_DESCRIPTION__"
+        NAME="__SERVICE_NAME__"
+        DAEMON="__SERVICE_EXECUTABLE__"
+        DAEMON_ARGS="__SERVICE_PARAMETERS__"
+        PIDFILE=/var/run/$NAME.pid
+        SCRIPTNAME=/etc/init.d/$NAME
+
+        # Exit if the package is not installed
+        [ -x "$DAEMON" ] || exit 0
+
+        # Read configuration variable file if it is present
+        [ -r /etc/default/$NAME ] && . /etc/default/$NAME
+
+        # Load the VERBOSE setting and other rcS variables
+        . /lib/init/vars.sh
+
+        # Define LSB log_* functions.
+        # Depend on lsb-base (>= 3.2-14) to ensure that this file is present
+        # and status_of_proc is working.
+        . /lib/lsb/init-functions
+
+        #
+        # Function that starts the daemon/service
+        #
+        do_start()
+        {
+            # Return
+            #   0 if daemon has been started
+            #   1 if daemon was already running
+            #   2 if daemon could not be started
+            start-stop-daemon --start --quiet --nicelevel 10 --pidfile $PIDFILE --exec $DAEMON --test > /dev/null \
+                || return 1
+            start-stop-daemon --start --quiet --nicelevel 10 --pidfile $PIDFILE --exec $DAEMON -- \
+                $DAEMON_ARGS \
+                || return 2
+            # Add code here, if necessary, that waits for the process to be ready
+            # to handle requests from services started subsequently which depend
+            # on this one.  As a last resort, sleep for some time.
+        }
+
+        #
+        # Function that stops the daemon/service
+        #
+        do_stop()
+        {
+            # Return
+            #   0 if daemon has been stopped
+            #   1 if daemon was already stopped
+            #   2 if daemon could not be stopped
+            #   other if a failure occurred
+            start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
+            RETVAL="$?"
+            [ "$RETVAL" = 2 ] && return 2
+            # Wait for children to finish too if this is a daemon that forks
+            # and if the daemon is only ever run from this initscript.
+            # If the above conditions are not satisfied then add some other code
+            # that waits for the process to drop all resources that could be
+            # needed by services started subsequently.  A last resort is to
+            # sleep for some time.
+            start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec $DAEMON
+            [ "$?" = 2 ] && return 2
+            # Many daemons don't delete their pidfiles when they exit.
+            rm -f $PIDFILE
+            return "$RETVAL"
+        }
+
+        #
+        # Function that sends a SIGHUP to the daemon/service
+        #
+        do_reload() {
+            #
+            # If the daemon can reload its configuration without
+            # restarting (for example, when it is sent a SIGHUP),
+            # then implement that here.
+            #
+            start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $NAME
+            return 0
+        }
+
+        case "$1" in
+        start)
+            [ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+            do_start
+            case "$?" in
+                0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+                2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+            esac
+            ;;
+        stop)
+            [ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+            do_stop
+            case "$?" in
+                0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+                2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+            esac
+            ;;
+        status)
+            status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
+            ;;
+        #reload|force-reload)
+            #
+            # If do_reload() is not implemented then leave this commented out
+            # and leave 'force-reload' as an alias for 'restart'.
+            #
+            #log_daemon_msg "Reloading $DESC" "$NAME"
+            #do_reload
+            #log_end_msg $?
+            #;;
+        restart|force-reload)
+            #
+            # If the "reload" option is implemented then remove the
+            # 'force-reload' alias
+            #
+            log_daemon_msg "Restarting $DESC" "$NAME"
+            do_stop
+            case "$?" in
+            0|1)
+                do_start
+                case "$?" in
+                    0) log_end_msg 0 ;;
+                    1) log_end_msg 1 ;; # Old process is still running
+                    *) log_end_msg 1 ;; # Failed to start
+                esac
+                ;;
+            *)
+                # Failed to stop
+                log_end_msg 1
+                ;;
+            esac
+            ;;
+        *)
+            #echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
+            echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+            exit 3
+            ;;
+        esac
+
+        :
+    EOF
+}
+
+init_services::template::testing() {
+    sed -e 's/^        //g' <<"    EOF"
+        [Unit]
+        Description=__SERVICE_DESCRIPTION__
+        Wants=network.target
+
+        [Service]
+        Type=simple
+        User=1000
+        Group=1000
+        Environment=
+        Nice=10
+        ExecStart=__SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
+        ExecStop=
+
+        [Install]
+        WantedBy=multi-user.target
+        Alias=__SERVICE_NAME__
+    EOF
+}

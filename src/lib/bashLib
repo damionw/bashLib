@@ -31,6 +31,7 @@ export BASHLIB_SUBCOMMANDS_PATH="${lib_path}/subcommands"
 . "${lib_path}/properties"
 . "${lib_path}/option_parsing"
 . "${lib_path}/settings"
+. "${lib_path}/init_services"
 
 bashlib::version() {
     echo "${BASHLIB_VERSION}"
