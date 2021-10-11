@@ -138,9 +138,8 @@ init_services::start_service() {
     case "$(init_services::service_config_scheme)" in
         "systemd")
             systemctl daemon-reload
-            systemctl enable "${_service_name}"
-            systemctl daemon-reload
             systemctl start "${_service_name}"
+            systemctl enable "${_service_name}"
             ;;
 
         "upstart")
@@ -231,7 +230,7 @@ init_services::service_config_details() {
     "${_prefix}${_config_scheme}" | m4 \
         -D__SERVICE_EXECUTABLE__="${_service_executable}" \
         -D__SERVICE_PARAMETERS__="${_service_parameters}" \
-        -D__SERVICE_NAME__="${_service_executable}" \
+        -D__SERVICE_NAME__="${_service_name}" \
         -D__SERVICE_DESCRIPTION__="${_service_description}"
 }
 
