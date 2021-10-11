@@ -8,7 +8,7 @@ local_path="$(dirname "${actual_name}")"
 #
 #=======================================================================
 export __INIT_SERVICES_SERVICE_SCHEME__=
-export __INIT_SERVICES_SERVICE_NAME__=testing
+export __INIT_SERVICES_SERVICE_NAME__=
 export __INIT_SERVICES_SERVICE_EXECUTABLE__=
 export __INIT_SERVICES_SERVICE_DESCRIPTION__=
 export __INIT_SERVICES_SERVICE_PARAMETERS__=
