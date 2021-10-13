@@ -12,6 +12,7 @@ export __INIT_SERVICES_SERVICE_NAME__=
 export __INIT_SERVICES_SERVICE_EXECUTABLE__=
 export __INIT_SERVICES_SERVICE_DESCRIPTION__=
 export __INIT_SERVICES_SERVICE_PARAMETERS__=
+export __INIT_SERVICES_SERVICE_ENVIRONMENT__=
 
 #=======================================================================
 #
@@ -86,6 +87,15 @@ init_services::service_config_scheme() {
         echo "upstart"
     else
         return 35
+    fi
+}
+
+init_services::service_environment() {
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_ENVIRONMENT__="$@"
+    else
+        echo "${__INIT_SERVICES_SERVICE_ENVIRONMENT__}"
     fi
 }
 
@@ -200,7 +210,7 @@ init_services::stop_service() {
 #=======================================================================
 init_services::service_config_details() {
     local _prefix="init_services::template::"
-    local _service_executable _service_name _service_description _service_parameters
+    local _service_executable _service_name _service_description _service_parameters _service_environment
     local _config_scheme
 
     if ! _service_executable="$(init_services::service_executable)"
@@ -213,6 +223,9 @@ init_services::service_config_details() {
     then
         return $?
     elif ! _service_parameters="$(init_services::service_parameters)"
+    then
+        return $?
+    elif ! _service_environment="$(init_services::service_environment)"
     then
         return $?
     elif ! _config_scheme="$(init_services::service_config_scheme)"
@@ -231,7 +244,8 @@ init_services::service_config_details() {
         -D__SERVICE_EXECUTABLE__="${_service_executable}" \
         -D__SERVICE_PARAMETERS__="${_service_parameters}" \
         -D__SERVICE_NAME__="${_service_name}" \
-        -D__SERVICE_DESCRIPTION__="${_service_description}"
+        -D__SERVICE_DESCRIPTION__="${_service_description}" \
+        -D__SERVICE_ENVIRONMENT__="${_service_environment}"
 }
 
 init_services::service_config_path() {
@@ -316,7 +330,7 @@ init_services::template::systemd() {
         Type=simple
         User=1000
         Group=1000
-        Environment=
+        Environment=__SERVICE_ENVIRONMENT__
         Nice=10
         ExecStart=__SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
         ExecStop=
@@ -342,9 +356,8 @@ init_services::template::upstart(){
         setuid 1000
 
         script
-            /usr/bin/nice -n 10 __SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
+            __SERVICE_ENVIRONMENT__ /usr/bin/nice -n 10 __SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
         end script
-
     EOF
 }
 
@@ -377,6 +390,7 @@ init_services::template::rc(){
         DAEMON_ARGS="__SERVICE_PARAMETERS__"
         PIDFILE=/var/run/$NAME.pid
         SCRIPTNAME=/etc/init.d/$NAME
+        export __=${__UNUSED__}" __SERVICE_ENVIRONMENT__
 
         # Exit if the package is not installed
         [ -x "$DAEMON" ] || exit 0
@@ -522,7 +536,7 @@ init_services::template::testing() {
         Type=simple
         User=1000
         Group=1000
-        Environment=
+        Environment=__SERVICE_ENVIRONMENT__
         Nice=10
         ExecStart=__SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
         ExecStop=
