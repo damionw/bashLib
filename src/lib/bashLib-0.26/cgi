@@ -47,15 +47,17 @@ cgi::request_handler() {
         return $?
     elif ! (declare -F | awk '{print $NF;}' | grep -q "^${_prefix}${_function_name}$")
     then
-        cgi::request_error 404 "${SCRIPT_NAME}${PATH_INFO}"
+        cgi::request_error 404 "${_function_name}" "${SCRIPT_NAME}${PATH_INFO}"
         return $?
     fi
     
     local _parameters=$(cgi::get_parameters)
 
+    # The function doesn't perform its own error responses. We do it here
+    #
     if ! "${_prefix}${_function_name}" ${_parameters}
     then
-        cgi::request_error 500 "${SCRIPT_NAME}${PATH_INFO}"
+        cgi::request_error 500 "${_function_name}" "${SCRIPT_NAME}${PATH_INFO}"
     fi
 }
 
@@ -69,14 +71,15 @@ cgi::response_header() {
 
 cgi::request_error() {
     local _status=$?
-    local _code="$1"
-    shift
+    local _code="${1}" _function="${2}"
+    shift 2
     local _details="$@"
 
     echo "HTTP/1.1 ${_code} ${HTTP_CODE[${_code}]}"
     echo ""
     echo "${_code} ${HTTP_CODE[${_code}]}"
-    echo "handler: ${_function_name}"
+    echo
+    echo "${_function}"
     echo "--------------------------------"
     echo "${_details}"
     echo "--------------------------------"
