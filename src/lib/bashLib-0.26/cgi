@@ -80,7 +80,7 @@ cgi::request_error() {
 cgi::request_manifest() {
     # Produce a list of api functions
 
-    local _prefix="$(cgi::request_prefix)"
+    local _prefix="$(cgi::requests_prefix)"
     local _function _separator
 
     cgi::response_header 200 text/plain ### DEBUG ###
