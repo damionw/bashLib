@@ -1,0 +1,103 @@
+cgi::requests_prefix() {
+    local _default="cgi::request::"
+
+    if [ -n "${1}" -o -z "${__CGI_REQUEST_PREFIX__}" ]
+    then
+        export __CGI_REQUEST_PREFIX__="${1:-${_default}}"
+    fi
+
+    if [ -z "${1}" ]
+    then
+        echo "${__CGI_REQUEST_PREFIX__}"
+    fi
+
+    true
+}
+
+cgi::get_parameters() {
+    local _regex="$(echo "${@}" | list::to_regex)"
+
+    echo "${QUERY_STRING}" |
+    tr '\&' '\n' |
+    sed -e 's/=/ /1' |
+    ([ -z "${_regex}" ] && cat || egrep -i "^(${_regex})[ ]")
+}
+
+cgi::request_handler() {
+    local _prefix="$(cgi::requests_prefix)"
+
+    local _function_name="$(
+        echo "${PATH_INFO}" |
+        sed -e 's|^/||g' -e 's|/|::|g' |
+        tr 'A-Z' 'a-z'
+    )"
+
+    local HTTP_CODE=(
+        [200]="OK"
+        [400]="Bad Request"
+        [403]="Forbidden"
+        [404]="Not Found"
+        [405]="Method Not Allowed"
+        [500]="Internal Server Error"
+    )
+
+    if [ -z "${_function_name}" ]
+    then
+        cgi::request_manifest
+        return $?
+    elif ! (declare -F | awk '{print $NF;}' | grep -q "^${_prefix}${_function_name}$")
+    then
+        cgi::request_error 404 "${SCRIPT_NAME}${PATH_INFO}"
+        return $?
+    fi
+    
+    local _parameters=$(cgi::get_parameters)
+
+    if ! "${_prefix}${_function_name}" ${_parameters}
+    then
+        cgi::request_error 500 "${SCRIPT_NAME}${PATH_INFO}"
+    fi
+}
+
+cgi::response_header() {
+    local _code=${1:-200}
+    local _type="${2:-application/json}"
+    echo "HTTP/1.1 ${_code} ${HTTP_CODE[${_code}]}"
+    echo "Content-type: ${_type}"
+    echo ""
+}
+
+cgi::request_error() {
+    local _code="$1"
+    shift
+    local _details="$@"
+
+    echo "HTTP/1.1 ${_code} ${HTTP_CODE[${_code}]}"
+    echo ""
+    echo "${HTTP_CODE[${_code}]}: ${_details} ${_function_name}"
+}
+
+cgi::request_manifest() {
+    # Produce a list of api functions
+
+    local _prefix="$(cgi::request_prefix)"
+    local _function _separator
+
+    cgi::response_header 200 text/plain ### DEBUG ###
+
+    declare -F |
+    awk '{print $NF;}' |
+    grep "^${_prefix}" |
+    sed -e "s|^${_prefix}||g" -e 's|::|/|g' | {
+        echo "["
+
+        while read _function
+        do
+            echo "${_separator}\"http://${HTTP_HOST}${SCRIPT_NAME}/${_function}\""
+            _separator=","
+        done
+
+        echo "]"
+    }
+}
+ 
