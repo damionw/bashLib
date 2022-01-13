@@ -68,6 +68,7 @@ cgi::response_header() {
 }
 
 cgi::request_error() {
+    local _status=$?
     local _code="$1"
     shift
     local _details="$@"
@@ -75,6 +76,8 @@ cgi::request_error() {
     echo "HTTP/1.1 ${_code} ${HTTP_CODE[${_code}]}"
     echo ""
     echo "${HTTP_CODE[${_code}]}: ${_details} ${_function_name}"
+
+    return ${_status}
 }
 
 cgi::request_manifest() {
