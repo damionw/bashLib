@@ -75,7 +75,9 @@ cgi::request_error() {
 
     echo "HTTP/1.1 ${_code} ${HTTP_CODE[${_code}]}"
     echo ""
-    echo "${HTTP_CODE[${_code}]}: ${_details} ${_function_name}"
+    echo "${_code}: ${HTTP_CODE[${_code}]}"
+    echo "handler: ${_function_name}"
+    echo "${_details}"
 
     return ${_status}
 }
