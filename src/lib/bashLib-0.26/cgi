@@ -79,7 +79,7 @@ cgi::request_error() {
     echo ""
     echo "${_code} ${HTTP_CODE[${_code}]}"
     echo
-    echo "${_function}"
+    echo "Function: ${_function}"
     echo "--------------------------------"
     echo "${_details}"
     echo "--------------------------------"
