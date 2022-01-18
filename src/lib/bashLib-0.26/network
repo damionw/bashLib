@@ -159,6 +159,10 @@ network::services::available_ports() {
         {
             ++i;
         }
+    } END {
+       for (; i < limit; ++i) {
+            print i;
+       }
     }' i=${start_port} limit=${stop_port}
 }
 
