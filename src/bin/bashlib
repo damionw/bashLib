@@ -49,7 +49,8 @@ optionslib::parse::config "
     long_options=--fatal action=command name=set_logging  description='Expose fatal error level logging'
     long_options=--env action=command name=virtualenv::path description='Provide the current virtualenv path (if any)'
     long_options=--lib action=command name=show_library_path description='Provide the library module import file'
-    long_options=--version short_options=-v action=command name=bashlib::version description='Produce the library version string'
+    long_options=--version:: short_options=-v action=command name=bashlib::version description='Produce/Select the library version string'
+    long_options=--versions action=command name=bashlib::versions description='Produce the available library versions'
     long_options=--commands action=command name=bashlib::subcommands description='List available subcommands'
 "
 

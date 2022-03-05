@@ -34,6 +34,9 @@ install: tests
 version: all
 	@build/bin/bashlib --version
 
+versions: all
+	@build/bin/bashlib --versions
+
 src/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION)/option_parsing: checkouts/optionslib/build/parse
 	@cp $< $@
 

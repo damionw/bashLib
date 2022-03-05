@@ -5,12 +5,16 @@ first_name="${BASH_SOURCE[0]}"
 actual_name="$(readlink -f "${first_name}")"
 local_path="$(dirname "${actual_name}")"
 
-export BASHLIB_VERSION="$(
+export __BASHLIB_VERSIONS__="$(
     find "${local_path}/${package_name}"-[.0-9]* -maxdepth 0 -mindepth 0 -type d -printf "%f\n" |
     awk -F- '{print $NF;}' |
-    sort -nr |
-    head -1
+    sort -nr
 )"
+
+export BASHLIB_VERSION="${BASHLIB_VERSION:-$(
+    echo "${__BASHLIB_VERSIONS__}" |
+    head -1
+)}"
 
 lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 
@@ -35,7 +39,16 @@ export BASHLIB_SUBCOMMANDS_PATH="${lib_path}/subcommands"
 . "${lib_path}/cgi"
 
 bashlib::version() {
-    echo "${BASHLIB_VERSION}"
+    if [ -n "$1" ]
+    then
+        export BASHLIB_VERSION="$1"
+    else
+        echo "${BASHLIB_VERSION}"
+    fi
+}
+
+bashlib::versions() {
+    echo "${__BASHLIB_VERSIONS__}"
 }
 
 bashlib::subcommands::path() {
