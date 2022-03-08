@@ -11,10 +11,7 @@ export __BASHLIB_VERSIONS__="$(
     sort -nr
 )"
 
-export BASHLIB_VERSION="${BASHLIB_VERSION:-$(
-    echo "${__BASHLIB_VERSIONS__}" |
-    head -1
-)}"
+export BASHLIB_VERSION=$(echo "${__BASHLIB_VERSIONS__}" | head -1)
 
 lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 
