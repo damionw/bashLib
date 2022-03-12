@@ -71,17 +71,12 @@ logging::private::_generate_reporters() {
     do
         sed -e 's/^[ ]*//g' <<< "
             logging::${_severity}() {
-                logging::format "'"$@"'"
+                logging::format ${_severity} "'"$@"'"
+                $([ "${_severity}" = fatal ] && echo exit 255)
             }
         "
     done
 }
 
-. "$(logging::private::_generate_reporters)"
-. "$(logging::private::_generate_setters)"
-
-# Override fatal logger
-logging::fatal() {
-    logging::format fatal "$@"
-    exit 255
-}
+eval "$(logging::private::_generate_reporters)"
+eval "$(logging::private::_generate_setters)"
