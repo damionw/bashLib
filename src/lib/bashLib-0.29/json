@@ -1,0 +1,124 @@
+json::get() {
+    local _key _json
+    _json="${1:?Need to supply a json structure}" || return $?
+    _key="${2}"
+    echo "${_json}" | jq -r ".${_key}"
+}
+
+json::set() {
+    local _key _value _json
+    _json="${1:?Need to supply a json structure}" || return $?
+    _key="${2}"
+    _value="${3:?Need to supply a json datatype for insertion}" || return $?
+    echo "${_json}" | jq -r ".${_key} |= ${_value}"
+}
+
+json::length() {
+    local _key _json
+    _json="${1:?Need to supply a json structure}" || return $?
+    _key="${2}"
+    echo "${_json}" | jq -r ".${_key} | length"
+}
+
+json::type() {
+    local _key _json
+    _json="${1:?Need to supply a json structure}" || return $?
+    _key="${2}"
+    echo "${_json}" | jq -r ".${_key} | type"
+}
+
+json::keys() {
+    local _key _json
+    _json="${1:?Need to supply a json structure}" || return $?
+    _key="${2}"
+    echo "${_json}" | jq -r ".${_key} | keys"
+}
+
+json::slice() {
+    local _keys _json _length _start _end _output="[]" _type
+    local _output_index _index _quote
+
+    _json="${1:?Need to supply a json structure}" || return $?
+    _start="${2:-0}"
+    _end="${3:--1}"
+    _keys="$(json::keys "${_json}")"
+    _length="$(json::length "${_keys}")"
+    _type="$(json::type "${_json}" "${_key}")" || return $?
+    
+    case "${_type}" in
+        object)
+            _quote='"'
+            ;;
+    esac
+    
+    fixit() {
+        local _index="${1:-0}" _limit="${2:-0}"
+        
+        if ((${_index} < 0))
+        then
+            _index=$((${_limit} + ${_index}))
+        fi
+
+        if ((${_index} < 0))
+        then
+            _index=0
+        elif ((${_index} > ${_limit}))
+        then
+            _index=${_limit}
+        fi
+        
+        echo "${_index}"
+    }
+
+    _start="$(fixit "${_start}" "${_length}")"
+    _end="$(fixit "${_end}" "${_length}")"
+
+    for ((_index=${_start}; _index <= ${_end}; ++_index)) {
+        _output_index=$((${_index} - ${_start}))
+        _output_key="$(json::get "${_keys}" "[${_index}]")"
+        _slice_content="$(json::get "${_json}" "[${_quote}${_output_key}${_quote}]")"
+        _output="$(json::set "${_output}" "[${_output_index}]" "${_slice_content}")"
+    }
+
+    echo "${_output}"
+}
+
+json::call() {
+    # Call the specified function against array elements or object key/value pairs
+    local _key _callable _json _type _length _selection _command _index
+
+    _json="${1:?Need to supply a json structure}" || return $?
+    _key="${2}"
+    _callable="${3:?Need to supply a bash function|executable}" || return $?
+    _selection="$(json::get "${_json}" "${_key}")" || return $?
+    _type="$(json::type "${_json}" "${_key}")" || return $?
+    _length="$(json::length "${_json}" "${_key}")" || return $?
+    _command="${_callable}"
+
+    case "${_type}" in
+        array)
+            for ((_index=0; _index < ${_length}; ++_index)) {
+                _command="${_command} '$(json::get "${_selection}" "[${_index}]")'"
+            }
+            ;;
+
+        object)
+            local _object_keys="$(json::keys "${_json}" "${_key}")" || return $?
+
+            for ((_index=0; _index < ${_length}; ++_index)) {
+                local _object_key="$(json::get "${_object_keys}" "[${_index}]")" || return $?
+                local _object_value="$(json::get "${_selection}" "[\"${_object_key}\"]")" || return $?
+                local _sep="$(echo "${_object_value}" | egrep -q '^[0-9.][0-9.]*$' || echo '"')"
+                _command="${_command} '{\"${_object_key}\": ${_sep}${_object_value}${_sep}}'"
+            }
+            ;;
+
+        *)
+            _command="${_command} '${_selection}'"
+            ;;
+    esac
+
+    logging::info "CALL: ${_command}"
+
+    eval "${_command}"
+}
