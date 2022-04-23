@@ -80,3 +80,16 @@ logging::private::_generate_reporters() {
 
 eval "$(logging::private::_generate_reporters)"
 eval "$(logging::private::_generate_setters)"
+
+logging::notify() {
+    local _summary _message _retval=$?
+
+    _summary="${1:?No summary supplied}" || return ${_retval}
+    shift
+    _message="$@"
+
+    DISPLAY=${DISPLAY:-:0.0} notify-send --category="email" "${_summary}" "${_message}" >&2
+
+    return ${_retval}
+}
+
