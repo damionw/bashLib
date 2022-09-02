@@ -132,6 +132,7 @@ init_services::remove_service() {
         return $?
     else
         logging::warning "Removed config '${_service_path}'"
+        true
     fi
 }
 
