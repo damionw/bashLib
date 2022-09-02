@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#=======================================================================
+#
+#=======================================================================
+ACTION="$1"
+VERSION="$2"
+VARDIR="/var/lib/dpkg/info"
+PACKAGE_NAME="${DPKG_MAINTSCRIPT_PACKAGE}" # this is lowercased
+LISTFILE="${VARDIR}/${PACKAGE_NAME}.list"
+PACKAGE_DIR=$(grep -i "${PACKAGE_NAME}"'$' < "${LISTFILE}" | head -1)
+export PATH="${PACKAGE_DIR}/bin:${PATH}"
+hash -r
+
+#=======================================================================
+#
+#=======================================================================
+create_path_files() {
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'export PATH="${PATH}:'"${PACKAGE_DIR}/bin"'"'
+    } > /etc/profile.d/${PACKAGE_NAME}.sh
+
+    chmod 755 /etc/profile.d/${PACKAGE_NAME}.sh
+}
+
+remove_path_files() {
+    rm /etc/profile.d/${PACKAGE_NAME}.sh >/dev/null 2>&1
+}
+
+#=======================================================================
+#                  Install/Remove service components
+#=======================================================================
+. $("${PACKAGE_DIR}/bin/${PACKAGE_NAME}" --lib)
+
+init_services::service_name "${PACKAGE_NAME}"
+init_services::service_executable "${PACKAGE_DIR}/bin/${PACKAGE_NAME}"
+init_services::service_description "${PACKAGE_NAME}"
+init_services::service_parameters "collect"
+
+case "$ACTION" in
+    configure)
+        # create_path_files
+        init_services::install_service
+        init_services::start_service
+        ;;
+
+    remove|upgrade)
+        init_services::stop_service
+        init_services::remove_service
+        # remove_path_files
+        ;;
+esac
