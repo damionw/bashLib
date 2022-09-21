@@ -93,7 +93,7 @@ cgi::request_manifest() {
     local _prefix="$(cgi::requests_prefix)"
     local _function _separator
 
-    cgi::response_header 200 text/plain ### DEBUG ###
+    cgi::response_header 200 application/json
 
     declare -F |
     awk '{print $NF;}' |
