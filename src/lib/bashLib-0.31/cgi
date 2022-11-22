@@ -15,12 +15,7 @@ cgi::requests_prefix() {
 }
 
 cgi::get_parameters() {
-    local _regex="$(echo "${@}" | list::to_regex)"
-
-    echo "${QUERY_STRING}" |
-    tr '\&' '\n' |
-    sed -e 's/=/ /1' |
-    ([ -z "${_regex}" ] && cat || egrep -i "^(${_regex})[ ]")
+    echo "${1:-${QUERY_STRING}}" | tr '&' '\n' | sed -e 's/=/ /1'
 }
 
 cgi::request_handler() {
@@ -67,7 +62,7 @@ cgi::request_handler() {
         local _error_reponse="${_response}"
 
         # Try to let the handler provide an error content generator first
-        _response="$("${_prefix}${_function_name}::error_content" ${_parameters})" || {
+        _response="$("${_prefix}${_function_name}::error_content" "${_parameters}")" || {
             _response="$(
                 cgi::request_error 500 "$(
                     echo "${_function_name} failed via url ${SCRIPT_NAME}${PATH_INFO}"
