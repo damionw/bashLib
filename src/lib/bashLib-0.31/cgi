@@ -41,51 +41,78 @@ cgi::request_handler() {
         [500]="Internal Server Error"
     )
 
-    if [ -z "${_function_name}" ]
+    local _status
+
+    if [[ -z "${_function_name}" ]]
     then
         cgi::request_manifest
-        return $?
-    elif ! (declare -F | awk '{print $NF;}' | grep -q "^${_prefix}${_function_name}$")
-    then
-        cgi::request_error 404 "${_function_name}" "${SCRIPT_NAME}${PATH_INFO}"
-        return $?
+        return
     fi
-    
-    local _parameters=$(cgi::get_parameters)
 
-    # The function doesn't perform its own error responses. We do it here
-    #
-    if ! "${_prefix}${_function_name}" ${_parameters}
-    then
-        cgi::request_error 500 "${_function_name}" "${SCRIPT_NAME}${PATH_INFO}"
-    fi
+    (declare -F | awk '{print $NF;}' | grep -q "^${_prefix}${_function_name}$") || {
+        _status=$?
+
+        cgi::request_error 404 "$(
+            echo "${_function_name} not available via url ${SCRIPT_NAME}${PATH_INFO}"
+        )" text/plain
+
+        return ${_status}
+    }
+
+    local _response _parameters=$(cgi::get_parameters)
+
+    _response="$("${_prefix}${_function_name}" ${_parameters})" || {
+        _status=$?
+
+        local _error_reponse="${_response}"
+
+        # Try to let the handler provide an error content generator first
+        _response="$("${_prefix}${_function_name}::error_content" ${_parameters})" || {
+            _response="$(
+                cgi::request_error 500 "$(
+                    echo "${_function_name} failed via url ${SCRIPT_NAME}${PATH_INFO}"
+                    echo "${_error_response}"
+                )" text/plain
+            )"
+        }
+
+        echo "${_response}"
+        return ${_status}
+    }
+
+    echo "${_response}"
 }
 
 cgi::response_header() {
     local _code=${1:-200}
-    local _type="${2:-application/json}"
+    local _content_type="${2:-application/json}"
+
     echo "HTTP/1.1 ${_code} ${HTTP_CODE[${_code}]}"
-    echo "Content-type: ${_type}"
+    echo "Content-type: ${_content_type}"
     echo ""
 }
 
 cgi::request_error() {
     local _status=$?
-    local _code="${1}" _function="${2}"
-    shift 2
-    local _details="$@"
+    local _code="${1}"
+    local _content="${2:-Unspecified Error}"
+    local _type="${3:-text/plain}"
 
-    echo "HTTP/1.1 ${_code} ${HTTP_CODE[${_code}]}"
-    echo ""
-    echo "${_code} ${HTTP_CODE[${_code}]}"
-    echo
-    echo "Function: ${_function}"
-    echo "--------------------------------"
-    echo "${_details}"
-    echo "--------------------------------"
-
+    cgi::response_header "${_code}" "${_type}"
+    echo "${_content}"
     return ${_status}
 }
+
+# cgi::_default_error_content() {
+#     local _function="${2}" _details="${3}"
+#
+#     echo "text/plain"
+#     echo "Function: ${_function}"
+#     echo "--------------------------------"
+#     echo "${_details}"
+#     echo "--------------------------------"
+# }
+
 
 cgi::request_manifest() {
     # Produce a list of api functions
@@ -98,6 +125,7 @@ cgi::request_manifest() {
     declare -F |
     awk '{print $NF;}' |
     grep "^${_prefix}" |
+    grep -v '::error_content$' |
     sed -e "s|^${_prefix}||g" -e 's|::|/|g' | {
         echo "["
 
