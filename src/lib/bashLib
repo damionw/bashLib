@@ -34,7 +34,8 @@ export BASHLIB_SUBCOMMANDS_PATH="${lib_path}/subcommands"
 . "${lib_path}/settings"
 . "${lib_path}/init_services"
 . "${lib_path}/cgi"
-. "${lib_path}/json"
+. "${lib_path}/json" # Deprecated
+. "${lib_path}/json_transform"
 
 bashlib::version() {
     if [ -n "$1" ]
