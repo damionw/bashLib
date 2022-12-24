@@ -44,7 +44,7 @@ cgi::request_handler() {
         return
     fi
 
-    (declare -F | awk '{print $NF;}' | grep -q "^${_prefix}${_function_name}$") || {
+    (declare -F | awk '$NF ~ /^'"${_prefix}${_function_name}"'$/ {print $NF;}') || {
         _status=$?
 
         cgi::request_error 404 "$(
