@@ -1,0 +1,118 @@
+functional::map() {
+    __map__::default::start() { echo -n "("; }
+    __map__::default::iter() { echo -n "$2"; }
+    __map__::default::interstitial() { echo -n ","; }
+    __map__::default::end() { echo ")"; }
+
+    __map__::list::start() { echo -n "["; }
+    __map__::list::iter() { echo -n "$(_quoted "$1")"; }
+    __map__::list::end() { echo "]"; }
+
+    __map__::dict::start() { echo -n "{"; }
+    __map__::dict::iter() { echo -n "\"$1\": $(_quoted "$2")"; }
+    __map__::dict::end() { echo "}"; }
+
+    _quoted() {
+        local _first=${1:0:1} _last=${1:$((${#1} - 1)):1} _quote='"'
+
+        if [[ "${_first}" == "[" && "${_last}" == "]" ]]
+        then
+            _quote=
+        elif [[ "${_first}" == "{" && "${_last}" == "}" ]]
+        then
+            _quote=
+        elif [[ "${_first}" == '"' && "${_last}" == '"' ]]
+        then
+            _quote=
+        fi
+
+        echo -n "${_quote}${1}${_quote}"
+    }
+
+    local _parameter _parameter_value _parameter_name
+    local -a _default_array=()
+    local -A _settings
+
+    _settings[start]=__map__::default::start
+    _settings[function]=__map__::default::iter
+    _settings[interstitial]=__map__::default::interstitial
+    _settings[end]=__map__::default::end
+    _settings[array]=default_array
+
+    for _parameter in "$@"
+    do
+        {
+            read _parameter_name
+            read _parameter_value
+        } <<< "$(echo "${_parameter}" | sed -e 's/=/\n/1')"
+
+        if [[ -z "${_parameter_value}" ]]
+        then
+            _settings[array]="${_parameter}"
+        else
+            case "${_parameter_name}" in
+                start|end|function|array|interstitial)
+                    _settings[${_parameter_name}]="${_parameter_value}"
+                    ;;
+
+                separator|interim) # Alias for interstitial
+                    _settings[interstitial]="${_parameter_value}"
+                    ;;
+
+                iter) # Alias for function
+                    _settings[function]="${_parameter_value}"
+                    ;;
+
+                mode)
+                    case "${_parameter_value}" in
+                        json-list|json-array|list)
+                            _settings[start]=__map__::list::start
+                            _settings[function]=__map__::list::iter
+                            _settings[interstitial]=__map__::default::interstitial
+                            _settings[end]=__map__::list::end
+                            ;;
+
+                        json-dict|dict)
+                            _settings[start]=__map__::dict::start
+                            _settings[function]=__map__::dict::iter
+                            _settings[interstitial]=__map__::default::interstitial
+                            _settings[end]=__map__::dict::end
+                            ;;
+
+                        *)
+                            logging::error "No such mode ${_parameter_value}"
+                            return 56
+                            ;;
+                    esac
+                    ;;
+
+                *)
+                    logging::error "Unknown option ${_parameter_name}"
+                    return 98
+                    ;;
+            esac
+        fi
+    done
+
+    local _script='
+        __func__() {
+            local _key _value _i=0
+
+            '"${_settings[start]}"'
+
+            for _key in ${!'"${_settings[array]}"'[@]}
+            do
+                [[ ${_i} > 0 ]] && '"${_settings[interstitial]}"' "${_i}"
+                local _value="${'"${_settings[array]}"'[${_key}]}"
+                '"${_settings[function]}"' "${_key}" "${_value}"
+                ((++_i))
+            done
+
+            '"${_settings[end]}"'
+        }
+    '
+
+    eval "${_script}"
+
+    __func__
+}

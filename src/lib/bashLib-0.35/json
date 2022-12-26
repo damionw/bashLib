@@ -1,3 +1,23 @@
+#============================================================
+#
+#============================================================
+json::associative_array::to_json() {
+    # Produce JSON dict from a named associative array variable
+    local _array_name
+    _array_name="${1:?Provide associative array variable name}" || return $?
+    functional::map "${_array_name}" mode=json-dict
+}
+
+json::list::to_json() {
+    # Produce JSON array from a named array variable
+    local _array_name
+    _array_name="${1:?Provide array variable name}" || return $?
+    functional::map "${_array_name}" mode=json-list
+}
+
+#============================================================
+#                    Deprecated Functions
+#============================================================
 json::get() {
     local _key _json
     _json="${1:?Need to supply a json structure}" || return $?
