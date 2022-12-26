@@ -1,4 +1,28 @@
 functional::map() {
+# --------------------------------------------------------------------
+# Map()'s a function over a named array
+#
+# Accepts keyword values (format name=value):
+#
+#     start: function name to apply at beginning of sequence
+#     end: function name to apply at end of sequence
+#     function|iter: function name used to handle a list element. Takes $1(key) $2(value)
+#     array: name of the array variable
+#     interstitial|separator|interim: function name to write a separator (default=,)
+#
+#     mode: Boxed output modes
+#         json-list -> prepares output in JSON list
+#         json-dict -> prepares output in JSON dict
+#
+#     Unnamed parameter will imply array=
+#
+# e.g.
+#     functional::map mylist start=list::start function=list::iter end=list::end
+#     functional::map array=dict start=dict::start function=dict::iter end=dict::end
+#     functional::map mylist
+#     functional::map dict mode=json-dict
+# --------------------------------------------------------------------
+
     __map__::default::start() { echo -n "("; }
     __map__::default::iter() { echo -n "$2"; }
     __map__::default::interstitial() { echo -n ","; }
@@ -43,7 +67,7 @@ functional::map() {
     do
         {
             read _parameter_name
-            read _parameter_value
+            _parameter_value="$(cat)"
         } <<< "$(echo "${_parameter}" | sed -e 's/=/\n/1')"
 
         if [[ -z "${_parameter_value}" ]]
