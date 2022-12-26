@@ -37,20 +37,15 @@ functional::map() {
     __map__::dict::end() { echo "}"; }
 
     _quoted() {
-        local _first=${1:0:1} _last=${1:$((${#1} - 1)):1} _quote='"'
+        case "${1:0:1}${1:$((${#1} - 1)):1}" in # Check first and last character pair
+            '[]'|'{}'|'""') # Looking for JSON dicts, arrays, or strings
+                echo -n "${1}"
+                ;;
 
-        if [[ "${_first}" == "[" && "${_last}" == "]" ]]
-        then
-            _quote=
-        elif [[ "${_first}" == "{" && "${_last}" == "}" ]]
-        then
-            _quote=
-        elif [[ "${_first}" == '"' && "${_last}" == '"' ]]
-        then
-            _quote=
-        fi
-
-        echo -n "${_quote}${1}${_quote}"
+            *) # Everything else is an unquoted string
+                echo -n "\"${1}\""
+                ;;
+        esac
     }
 
     local _parameter _parameter_value _parameter_name
