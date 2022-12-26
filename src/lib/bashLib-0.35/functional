@@ -29,7 +29,7 @@ functional::map() {
     __map__::default::end() { echo ")"; }
 
     __map__::list::start() { echo -n "["; }
-    __map__::list::iter() { echo -n "$(_quoted "$1")"; }
+    __map__::list::iter() { echo -n "$(_quoted "$2")"; }
     __map__::list::end() { echo "]"; }
 
     __map__::dict::start() { echo -n "{"; }

@@ -1,4 +1,5 @@
 PACKAGE_NAME := bashLib
+
 PACKAGE_VERSION := $(shell bash -c '. src/lib/$(PACKAGE_NAME) 2>/dev/null; bashlib::version')
 INSTALL_PATH := $(shell python -c 'import sys; sys.stdout.write("{}\n".format(sys.prefix)) if hasattr(sys, "real_prefix") or hasattr(sys, "base_prefix") else exit(255)' 2>/dev/null || echo "/usr/local")
 LIB_COMPONENTS := $(wildcard src/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION)/*)
