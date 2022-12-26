@@ -46,6 +46,43 @@ json::list::from_json() {
     }
 }
 
+json::csv::to_json() {
+    local _content _row _i
+    local -a _values _header _output
+    local -A _data
+
+    _content="${1:?Need to provide CSV content}"
+    _separator="${2:-,}"
+
+    {
+        while read _row
+        do
+            if [ -z "${_row}" ]
+            then
+                continue
+            fi
+
+            _values=( $(echo "${_row}" | tr "${_separator}" '\n') )
+
+            if [[ "${#_header[@]}" == 0 ]]
+            then
+                _header=("${_values[@]}")
+                continue
+            fi
+
+            _data=()
+
+            for ((_i=0; ${_i} < ${#_header[@]}; ++_i)) {
+                _data[${_header[${_i}]}]="${_values[${_i}]}"
+            }
+
+            _output[${#_output[@]}]="$(functional::map _data mode=json-dict _data)"
+        done
+    } <<< "${_content}"
+
+    functional::map _output mode=json-list
+}
+
 #============================================================
 #                    Deprecated Functions
 #============================================================
