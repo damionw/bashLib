@@ -113,7 +113,7 @@ functional::map() {
         fi
     done
 
-    local _script='
+    eval '
         __func__() {
             local _key _value _i=0
 
@@ -122,16 +122,13 @@ functional::map() {
             for _key in ${!'"${_settings[array]}"'[@]}
             do
                 [[ ${_i} > 0 ]] && '"${_settings[interstitial]}"' "${_i}"
-                local _value="${'"${_settings[array]}"'[${_key}]}"
-                '"${_settings[function]}"' "${_key}" "${_value}"
+                '"${_settings[function]}"' "${_key}" "${'"${_settings[array]}"'[${_key}]}"
                 ((++_i))
             done
 
             '"${_settings[end]}"'
         }
     '
-
-    eval "${_script}"
 
     __func__
 }
