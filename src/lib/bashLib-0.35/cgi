@@ -62,7 +62,7 @@ cgi::request_handler() {
         local _error_reponse="${_response}"
 
         # Try to let the handler provide an error content generator first
-        _response="$("${_prefix}${_function_name}::error_content" "${_parameters}")" 2>/dev/null || {
+        _response="$("${_prefix}${_function_name}::error_content" "${_parameters}" 2>/dev/null)" || {
             _response="$(
                 cgi::request_error 500 "$(
                     echo "${_function_name} failed via url ${SCRIPT_NAME}${PATH_INFO}"
