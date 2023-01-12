@@ -1,0 +1,1 @@
+Implement package repo capability a la https://github.com/bpkg/bpkg#installing-packages
