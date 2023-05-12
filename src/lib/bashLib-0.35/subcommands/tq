@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+#===================================================================================
+#                          Import tools library
+#===================================================================================
+. "$(bashlib --lib)"
+
+#===================================================================================
+#                              Logging Options
+#===================================================================================
+logging::set_severity info
+
+#===================================================================================
+#                           Command line option handlers
+#===================================================================================
+set_logging() {
+    logging::set_severity "$(echo "${1}" | sed -e 's/^[\-]*//g')"
+}
+
+#===================================================================================
+#                              Default Settings
+#===================================================================================
+conversion_string=
+command_string="echo $1"    
+processor_count=$(awk '/^processor[ \t]*/{print $NF;}' /proc/cpuinfo | sort -n | tail -1)
+job_count=$(( ${processor_count:-2} / 2 ))
+source_file="/dev/stdin"
+
+#===================================================================================
+#                           Process command line options
+#===================================================================================
+optionslib::parse::description "Text Queue job processor"
+
+optionslib::parse::config "
+    long_options=--help short_options=-h action=show_help description='Display instructions'
+    long_options=--debug action=command name=set_logging description='Expose debug level logging'
+    long_options=--info action=command name=set_logging  description='Expose normal level logging'
+    long_options=--warning action=command name=set_logging  description='Expose error level logging'
+    long_options=--error action=command name=set_logging  description='Expose error level logging'
+    long_options=--fatal action=command name=set_logging  description='Expose fatal error level logging'
+    long_options=--version:: short_options=-v action=command name=bashlib::version description='Produce/Select the library version string'
+    long_options=--jobs:: action=store_var name=job_count description='Number of concurrent jobs'
+    long_options=--command:: action=store_var name=command_string description='shell command to run on input datum'
+    long_options=--conversion:: action=store_var name=conversion_string description='jq command for input datum'
+    long_options=--source:: action=store_var name=source_file description='stream to read from'
+"
+
+if ! optionslib::parse::parse_arguments "$@"
+then
+    exit 255
+fi
+
+#===================================================================================
+#
+#===================================================================================
+
+echo $job_count
