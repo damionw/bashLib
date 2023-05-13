@@ -91,7 +91,7 @@ _streaming_example() {
 supervisor() {
     local _json _source _cmd
 
-    exec 11<&0 12>&1 12>&2 # Capture stdin, stdout & stderr
+    exec 11<&0 12>&1 13>&2 # Capture stdin, stdout & stderr
 
     _source="${1:?Need to provide source file}" || return $?
     _cmd="${2:?Need to provide command string}" || return $?
