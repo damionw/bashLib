@@ -89,19 +89,38 @@ _streaming_example() {
 #
 #===================================================================================
 supervisor() {
-    local _json _source _cmd
+    local _json _source _cmd _count _i _pid
 
     exec 11<&0 12>&1 13>&2 # Capture stdin, stdout & stderr
 
     _source="${1:?Need to provide source file}" || return $?
     _cmd="${2:?Need to provide command string}" || return $?
+    _count="${3:?Need to provide number of concurrent tasks}" || return $?
+
+    local -a _tasklist
 
     stdbuf -i0 -o0 tail --bytes=+0 --follow=name "${_source}" | stdbuf -i0 -o0 jq -j '(. | tojson) + "\u0000"' | {
-        while read -d $'\0' _json
+        while true
         do
-            bash -c "${_cmd}" -- "${_json}" <&11 >&12 2>&13
+            # Prune finished processes (we should wait on them !
+
+            for ((_i="${#_tasklist[@]} - 1"; _i >= 0; --_i)) {
+                _pid="${_tasklist[${_i - 1}]}"
+
+                if ! -d /proc/${_pid}
+                then
+                    unset _tasklist[${_i}]
+                fi
+            }
+
+            while read -d $'\0' _json
+            do
+                bash -c "${_cmd}" -- "${_json}" <&11 >&12 2>&13
+            done
         done
     }
+    
+    # Shutdown pids
 }
 
 #===================================================================================
