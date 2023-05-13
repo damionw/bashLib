@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 #===================================================================================
 #                          Import tools library
 #===================================================================================
@@ -53,5 +52,40 @@ fi
 #===================================================================================
 #
 #===================================================================================
+# See: https://stackoverflow.com/questions/54725080/using-jq-how-can-i-split-a-json-stream-of-objects-into-separate-files-based-on
 
+_streaming_example() {
+    case $BASH_VERSION in ''|[1-3].*|4.0*) echo "ERROR: Bash 4.1 needed" >&2; exit 1;; esac
+
+    declare -A output_fds=( )
+
+    while IFS= read -r -d '' type && IFS= read -r -d '' content; do
+    if [[ ${output_fds[$type]} ]]; then  # already have a file handle for this output file?
+        curr_fd=${output_fds[$type]}       # reuse it, then.
+    else
+        exec {curr_fd}>"$type.json"        # open a new output file...
+        output_fds[$type]=$curr_fd         # and store its file descriptor for use.
+    fi
+    printf '%s\n' "$content" >&"$curr_fd"
+    done < <(jq -j '(.type) + "\u0000" + (. | tojson) + "\u0000"')
+}
+
+# See https://stackoverflow.com/questions/8677546/reading-null-delimited-strings-through-a-bash-loop
+#     The following code works when reading from a file, but I need to read from a variable containing text.
+_read_to_null_byte() {
+
+    while read -d $'\0' line ; do
+        # Code here
+    done < /path/to/inputfile
+}
+
+# See: https://unix.stackexchange.com/questions/25372/turn-off-buffering-in-pipe
+#      Turning off line buffering
+# stdbuf -i0 -o0 -e0 command
+
+# Demo
+# while true; do cat jsonstream.txt; sleep 2; done | stdbuf -i0 -o0 -e0 jq -j '(. | tojson) + "\u0000"' | while read -d $'\0' x; do echo "$x"; break; done;
+#===================================================================================
+#
+#===================================================================================
 echo $job_count
