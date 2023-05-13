@@ -20,7 +20,7 @@ set_logging() {
 #                              Default Settings
 #===================================================================================
 conversion_string=
-command_string="echo $1"    
+command_string='echo $1'    
 processor_count=$(awk '/^processor[ \t]*/{print $NF;}' /proc/cpuinfo | sort -n | tail -1)
 job_count=$(( ${processor_count:-2} / 2 ))
 source_file="/dev/stdin"
@@ -72,12 +72,12 @@ _streaming_example() {
 
 # See https://stackoverflow.com/questions/8677546/reading-null-delimited-strings-through-a-bash-loop
 #     The following code works when reading from a file, but I need to read from a variable containing text.
-_read_to_null_byte() {
-
-    while read -d $'\0' line ; do
-        # Code here
-    done < /path/to/inputfile
-}
+# _read_to_null_byte() {
+# 
+#     while read -d $'\0' line ; do
+#         # Code here
+#     done < /path/to/inputfile
+# }
 
 # See: https://unix.stackexchange.com/questions/25372/turn-off-buffering-in-pipe
 #      Turning off line buffering
@@ -88,4 +88,23 @@ _read_to_null_byte() {
 #===================================================================================
 #
 #===================================================================================
-echo $job_count
+supervisor() {
+    local _json _source _cmd
+
+    exec 11<&0 12>&1 12>&2 # Capture stdin, stdout & stderr
+
+    _source="${1:?Need to provide source file}" || return $?
+    _cmd="${2:?Need to provide command string}" || return $?
+
+    stdbuf -i0 -o0 tail --bytes=+0 --follow=name "${_source}" | stdbuf -i0 -o0 jq -j '(. | tojson) + "\u0000"' | {
+        while read -d $'\0' _json
+        do
+            bash -c "set -x; ${_cmd}" -- "${_json}" # <&11 >&12 2>&13
+        done
+    }
+}
+
+#===================================================================================
+#
+#===================================================================================
+supervisor "${source_file}" "${command_string}"
