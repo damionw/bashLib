@@ -99,7 +99,7 @@ supervisor() {
     stdbuf -i0 -o0 tail --bytes=+0 --follow=name "${_source}" | stdbuf -i0 -o0 jq -j '(. | tojson) + "\u0000"' | {
         while read -d $'\0' _json
         do
-            bash -c "set -x; ${_cmd}" -- "${_json}" # <&11 >&12 2>&13
+            bash -c "${_cmd}" -- "${_json}" <&11 >&12 2>&13
         done
     }
 }
