@@ -157,6 +157,20 @@ supervisor() {
         done
 
         logging::info "All tasks have completed"
+
+        {
+            local _comma=
+
+            echo "{"
+
+            for _pid in "${!_results[@]}"
+            do
+                echo "${_comma}\"${_pid}\": ${_results[${_pid}]}"
+                _comma=","
+            done
+
+            echo "}"
+        } | jq -r .
     }
 }
 
