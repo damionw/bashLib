@@ -89,41 +89,68 @@ _streaming_example() {
 #
 #===================================================================================
 supervisor() {
-    local _json _source _cmd _count _i _pid
-
-    exec 11<&0 12>&1 13>&2 # Capture stdin, stdout & stderr
+    local _source _cmd _count
 
     _source="${1:?Need to provide source file}" || return $?
     _cmd="${2:?Need to provide command string}" || return $?
     _count="${3:?Need to provide number of concurrent tasks}" || return $?
 
-    local -a _tasklist
+    local -A _tasklist _results
+    local _exitcode _sleeper _pid _json _readstatus
+    local _waittime=2 _eof=0
+
+    exec 11<&0 12>&1 13>&2 # Capture stdin, stdout & stderr
 
     stdbuf -i0 -o0 tail --bytes=+0 --follow=name "${_source}" | stdbuf -i0 -o0 jq -j '(. | tojson) + "\u0000"' | {
-        while true
+        while [ "${#_tasklist[@]}" -gt 0 -o "${_eof}" = 0 ]
         do
-            # Prune finished processes (we should wait on them !
+            # Start new jobs if the tasklist allows it
+            if [ "${#_tasklist[@]}" -lt "${_count}" -a "${_eof}" = 0 ]
+            then
+                read -t ${_waittime} -d $'\0' _json
+                _readstatus=$?
 
-            for ((_i="${#_tasklist[@]} - 1"; _i >= 0; --_i)) {
-                _pid="${_tasklist[${_i - 1}]}"
+                case ${_readstatus} in
+                    0)
+                        bash -c "${_cmd}" -- "${_json}" <<< "${_json}" >&12 2>&13 & _pid=$!
+                        _tasklist[${_pid}]="${_json}"
+                        logging::info "Started pid ${_pid} with payload ${_json}"
+                        ;;
 
-                if ! -d /proc/${_pid}
-                then
-                    unset _tasklist[${_i}]
-                fi
-            }
+                    1)
+                        logging::info "EOF reached on input stream"
+                        _eof=1
+                        ;;
 
-            while read -d $'\0' _json
-            do
-                bash -c "${_cmd}" -- "${_json}" <&11 >&12 2>&13
-            done
+                    142)
+                        logging::info "Timeout on input stream"
+                        ;;
+
+                    *)
+                        ;;
+                esac
+            fi
+
+            sleep ${_waittime} & _sleeper=$!
+            wait -n -p _pid ${_sleeper} ${!_tasklist[@]} # Wait for one of the pids to exit
+            _exitcode=$?
+
+            if [[ "${_pid}" != "${_sleeper}" ]]
+            then
+                _json="${_tasklist[${_pid}]}"
+                logging::info "Process ${_pid} payload ${_json} exited with ${_exitcode}"
+                _results[${_pid}]=${_exitcode}
+                unset _tasklist[${_pid}]
+                kill "${_sleeper}" >/dev/null 2>&1
+                wait "${_sleeper}"
+            fi
         done
+
+        logging::info "All tasks have completed"
     }
-    
-    # Shutdown pids
 }
 
 #===================================================================================
 #
 #===================================================================================
-supervisor "${source_file}" "${command_string}"
+supervisor "${source_file}" "${command_string}" "${job_count}"
