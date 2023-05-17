@@ -38,6 +38,14 @@ version: all
 versions: all
 	@build/bin/bashlib --versions
 
+demo/tq: demo/tq/normal
+
+demo/tq/normal: all
+	@echo '[1,2,3]{"one": 1}' | build/bin/bashlib tq --command "jq -r '. | keys'"
+
+demo/tq/error: all
+	@echo '[1,2,3]{"one", 1}' | build/bin/bashlib tq --command "jq -r '. | keys'"
+
 src/lib/$(PACKAGE_NAME)-$(PACKAGE_VERSION)/option_parsing: checkouts/optionslib/build/parse
 	@cp $< $@
 

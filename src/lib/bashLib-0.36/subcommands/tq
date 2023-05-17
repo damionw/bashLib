@@ -111,14 +111,20 @@ supervisor() {
         else
             cat "${_source}"
         fi
-    } | stdbuf -i0 -o0 jq -j '(. | tojson) + "\u0000"' | {
+    } |
+    stdbuf -i0 -o0 jq --unbuffered -j '(. | tojson) + "\u0000"' |
+    {
         while [ "${#_tasklist[@]}" -gt 0 -o "${_eof}" = 0 ]
         do
             # Start new jobs if the tasklist allows it
             if [ "${#_tasklist[@]}" -lt "${_count}" -a "${_eof}" = 0 ]
             then
+#                _json="$(stdbuf -i0 -o0 jq --unbuffered -n 'try input catch input')"
                 read -t ${_waittime} -d $'\0' _json
                 _readstatus=$?
+
+                logging::warning "STATUS: ${_readstatus}"
+                logging::warning ${_json}
 
                 case ${_readstatus} in
                     0)
