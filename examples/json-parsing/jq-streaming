@@ -3,7 +3,7 @@
 emitter() {
     echo "[\"FIRST\"]"
 
-    for ((i=0; i < 4; ++i))
+    for ((i=0; i < 2; ++i))
     do
         echo '{1,2,3,4}' # Deliberate error !
         echo "{\"step\":"
@@ -17,16 +17,16 @@ emitter() {
     echo "[\"LAST\"]"
 }
 
-stream3() {
+unused_stream3() {
     stdbuf -i0 -o0 jq --unbuffered -r -R 'try fromjson? | .' |
     stdbuf -i0 -o0 jq --unbuffered -j '(. | tojson) + "\u0000"'
 }
 
-stream4() {
+unused_stream4() {
     stdbuf -i0 -o0 jq --unbuffered -j -r -R 'fromjson? | (. | tojson) + "\u0000"'
 }
 
-stream1() {
+unused_stream1() {
     while true
     do
         read -t 2 _buffer || break
@@ -43,7 +43,7 @@ receiver() {
     done
 }
 
-reader1() {
+unused_reader1() {
     while true
     do
         stdbuf -i0 -o0 jq --unbuffered -j '(. | tojson) + "\u0000"' | while read -t 3 -d $'\0' _json
@@ -59,7 +59,7 @@ reader1() {
 reader2() {
     local _payload _indicator _error
 
-    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -n 'try input catch ("ERROR=" + .)')
+    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -n 'try input catch ("ERROR=" + . + " AFTER " + (input | tostring))')
     do
         read _indicator _error <<< "$(awk -F= '{if (NR == 1) {print $1, $2;}}' <<< "${_payload}")"
 
@@ -69,8 +69,9 @@ reader2() {
                     break)
                         break
                         ;;
+
                     *)
-                        # echo ERROR ${_error} >&2
+                        echo ERROR ${_error} >&2
                         ;;
                 esac
                 ;;
@@ -83,4 +84,3 @@ reader2() {
 }
 
 emitter | reader2 | receiver
-# emitter | stream3 # | receiver
