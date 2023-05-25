@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+emitter() {
+    echo "[\"FIRST\"]"
+
+    for ((i=0; i < 4; ++i))
+    do
+        echo '{1,2,3,4}' # Deliberate error !
+        echo "{\"step\":"
+        echo "$i}"
+#        echo '{"one": 1, "two": 2}'
+        echo '[1,32,3,4
+        ]'
+        sleep 1
+    done
+
+    echo "[\"LAST\"]"
+}
+
+stream3() {
+    stdbuf -i0 -o0 jq --unbuffered -r -R 'try fromjson? | .' |
+    stdbuf -i0 -o0 jq --unbuffered -j '(. | tojson) + "\u0000"'
+}
+
+stream4() {
+    stdbuf -i0 -o0 jq --unbuffered -j -r -R 'fromjson? | (. | tojson) + "\u0000"'
+}
+
+stream1() {
+    while true
+    do
+        read -t 2 _buffer || break
+        (echo "${_buffer}"; cat) | stdbuf -i0 -o0 jq --unbuffered -j '(. | tojson) + "\u0000"'
+        echo "ERROR: $?" >&2
+    done
+}
+
+receiver() {
+    while read -t 3 -d $'\0' _json
+    do
+        echo "${_json}" | jq -r '.'
+        echo "=============="
+    done
+}
+
+reader1() {
+    while true
+    do
+        stdbuf -i0 -o0 jq --unbuffered -j '(. | tojson) + "\u0000"' | while read -t 3 -d $'\0' _json
+        do
+            _readstatus=$?
+            echo "ERROR: $_readstatus" >&2
+            echo "${_json}"
+            echo "==========="
+        done
+    done
+}
+
+reader2() {
+    local _payload _indicator _error
+
+    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -n 'try input catch ("ERROR=" + .)')
+    do
+        read _indicator _error <<< "$(awk -F= '{if (NR == 1) {print $1, $2;}}' <<< "${_payload}")"
+
+        case "${_indicator}" in
+            ERROR)
+                case "${_error}" in
+                    break)
+                        break
+                        ;;
+                    *)
+                        # echo ERROR ${_error} >&2
+                        ;;
+                esac
+                ;;
+
+            *)
+                echo "${_payload}" | jq --unbuffered -j '(. | tojson) + "\u0000"'
+                ;;
+        esac
+    done
+}
+
+emitter | reader2 | receiver
+# emitter | stream3 # | receiver

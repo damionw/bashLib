@@ -90,6 +90,32 @@ _streaming_example() {
 #===================================================================================
 #
 #===================================================================================
+_jq_stream() {
+    local _payload _indicator _error
+
+    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -n 'try input catch ("ERROR=" + .)')
+    do
+        read _indicator _error <<< "$(awk -F= '{if (NR == 1) {print $1, $2;}}' <<< "${_payload}")"
+
+        case "${_indicator}" in
+            ERROR)
+                case "${_error}" in
+                    break)
+                        break
+                        ;;
+                    *)
+                        # echo ERROR ${_error} >&2
+                        ;;
+                esac
+                ;;
+
+            *)
+                echo "${_payload}" | jq --unbuffered -j '(. | tojson) + "\u0000"'
+                ;;
+        esac
+    done
+}
+
 supervisor() {
     local _source _cmd _count _continuous
 
@@ -112,7 +138,7 @@ supervisor() {
             cat "${_source}"
         fi
     } |
-    stdbuf -i0 -o0 jq --unbuffered -r -R 'fromjson? | (. | tojson) + "\u0000"' |
+    _jq_stream |
     {
         while [ "${#_tasklist[@]}" -gt 0 -o "${_eof}" = 0 ]
         do
