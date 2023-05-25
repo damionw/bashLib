@@ -112,7 +112,7 @@ supervisor() {
             cat "${_source}"
         fi
     } |
-    stdbuf -i0 -o0 jq --unbuffered -j '(. | tojson) + "\u0000"' |
+    stdbuf -i0 -o0 jq --unbuffered -r -R 'fromjson? | (. | tojson) + "\u0000"' |
     {
         while [ "${#_tasklist[@]}" -gt 0 -o "${_eof}" = 0 ]
         do
@@ -122,6 +122,7 @@ supervisor() {
 #                _json="$(stdbuf -i0 -o0 jq --unbuffered -n 'try input catch input')"
                 read -t ${_waittime} -d $'\0' _json
                 _readstatus=$?
+                logging::info "STATUS=$?: READ: ${_json}"
 
                 logging::warning "STATUS: ${_readstatus}"
                 logging::warning ${_json}
