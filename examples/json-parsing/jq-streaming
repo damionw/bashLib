@@ -59,7 +59,8 @@ unused_reader1() {
 reader2() {
     local _payload _indicator _error
 
-    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -n 'try input catch ("ERROR=" + . + " AFTER " + (input | tostring))')
+#    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -j -n 'try input catch ("ERROR=" + . + " AFTER " + (input | tostring))')
+    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -j -n 'try input catch ("ERROR=" + .)')
     do
         read _indicator _error <<< "$(awk -F= '{if (NR == 1) {print $1, $2;}}' <<< "${_payload}")"
 
