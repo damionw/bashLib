@@ -90,10 +90,10 @@ _streaming_example() {
 #===================================================================================
 #
 #===================================================================================
-_jq_stream() {
+_unused_jq_stream() {
     local _payload _indicator _error
 
-    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -n 'try input catch ("ERROR=" + .)')
+    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -j -n 'try input catch ("ERROR=" + .)')
     do
         read _indicator _error <<< "$(awk -F= '{if (NR == 1) {print $1, $2;}}' <<< "${_payload}")"
 
@@ -113,6 +113,17 @@ _jq_stream() {
                 echo "${_payload}" | jq --unbuffered -j '(. | tojson) + "\u0000"'
                 ;;
         esac
+    done
+}
+
+_jq_stream() {
+    local _payload
+
+    while true
+    do
+        _payload="$(stdbuf -i0 -o0 jq -n -r --unbuffered 'inputs | (try .)')"
+        [[ "${_payload}" = "" ]] && break
+        echo "${_payload}" | jq --unbuffered -j '(. | tojson) + "\u0000"'
     done
 }
 
@@ -148,10 +159,6 @@ supervisor() {
 #                _json="$(stdbuf -i0 -o0 jq --unbuffered -n 'try input catch input')"
                 read -t ${_waittime} -d $'\0' _json
                 _readstatus=$?
-                logging::info "STATUS=$?: READ: ${_json}"
-
-                logging::warning "STATUS: ${_readstatus}"
-                logging::warning ${_json}
 
                 case ${_readstatus} in
                     0)
@@ -161,12 +168,12 @@ supervisor() {
                         ;;
 
                     1)
-                        logging::info "EOF reached on input stream"
+                        logging::warning "EOF reached on input stream"
                         _eof=1
                         ;;
 
                     142)
-                        logging::info "Timeout on input stream"
+                        logging::warning "Timeout on input stream"
                         ;;
 
                     *)

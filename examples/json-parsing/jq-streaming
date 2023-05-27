@@ -5,12 +5,11 @@ emitter() {
 
     for ((i=0; i < 2; ++i))
     do
-        echo '{1,2,3,4}' # Deliberate error !
-        echo "{\"step\":"
-        echo "$i}"
-#        echo '{"one": 1, "two": 2}'
-        echo '[1,32,3,4
-        ]'
+        cat <<< "
+            {\"step\":
+            $i} [1,32,3,4]
+            {1,2,3,4}
+        "
         sleep 1
     done
 
@@ -59,8 +58,7 @@ unused_reader1() {
 reader2() {
     local _payload _indicator _error
 
-#    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -j -n 'try input catch ("ERROR=" + . + " AFTER " + (input | tostring))')
-    while _payload=$(stdbuf -i0 -o0 jq -r --unbuffered -j -n 'try input catch ("ERROR=" + .)')
+    while _payload=$(stdbuf -i0 -o0 jq --unbuffered -r -n 'try input catch ("ERROR=" + .)')
     do
         read _indicator _error <<< "$(awk -F= '{if (NR == 1) {print $1, $2;}}' <<< "${_payload}")"
 
@@ -84,4 +82,15 @@ reader2() {
     done
 }
 
-emitter | reader2 | receiver
+reader3() {
+    local _payload
+
+    while true
+    do
+        _payload="$(stdbuf -i0 -o0 jq -n -r --unbuffered 'inputs | (try .)')"
+        [[ "${_payload}" = "" ]] && break
+        echo "${_payload}" | jq --unbuffered -j '(. | tojson) + "\u0000"'
+    done
+}
+
+emitter | reader3 | receiver
