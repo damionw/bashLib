@@ -156,7 +156,6 @@ supervisor() {
             # Start new jobs if the tasklist allows it
             if [ "${#_tasklist[@]}" -lt "${_count}" -a "${_eof}" = 0 ]
             then
-#                _json="$(stdbuf -i0 -o0 jq --unbuffered -n 'try input catch input')"
                 read -t ${_waittime} -d $'\0' _json
                 _readstatus=$?
 
@@ -179,6 +178,8 @@ supervisor() {
                     *)
                         ;;
                 esac
+            else
+                logging::warning "Tasks saturated at ${_count}"
             fi
 
             sleep ${_waittime} & _sleeper=$!
