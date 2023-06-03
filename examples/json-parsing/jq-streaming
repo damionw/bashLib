@@ -1,19 +1,42 @@
 #!/usr/bin/env bash
 
-emitter() {
+TOPIC="demo/timer"
+
+payload1() {
+    cat <<< "
+        {\"step\":
+        $i} [1,32,3,4]
+        {1,2,3,4}
+    "
+}
+
+payload2() {
+    echo "{\"time\": \"$(date +'%T')\","
+    echo "\"demo\": 1"
+}
+
+plain_emitter() {
+    payload1
+}
+
+looped_emitter() {
     echo "[\"FIRST\"]"
 
     for ((i=0; i < 2; ++i))
     do
-        cat <<< "
-            {\"step\":
-            $i} [1,32,3,4]
-            {1,2,3,4}
-        "
+        payload1
         sleep 1
     done
 
     echo "[\"LAST\"]"
+}
+
+mqtt-emitter() {
+    while true
+    do
+        mosquitto_pub -h localhost -t "${TOPIC}" -m "$(payload2)"
+        sleep 2
+    done
 }
 
 unused_stream3() {
@@ -93,4 +116,21 @@ reader3() {
     done
 }
 
-emitter | reader3 | receiver
+looped_demo() {
+    looped_emitter | reader3 | receiver
+}
+
+mqtt_demo() {
+    local _pid=nopid
+
+    onexit() {
+        kill "${_pid}"
+        wait "${_pid}"
+    }
+
+    mqtt-emitter & _pid=$!
+    trap 1 2 3 onexit
+    mosquitto_sub -h localhost -t "${TOPIC}"
+}
+
+mqtt_demo

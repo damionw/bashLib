@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+while true
+do
+    mosquitto_pub -h localhost -t 'demo/timer' -m "$(
+        echo "{\"time\": \"$(date +'%T')\","
+        echo "\"demo\": 1"
+    )"
+
+    sleep 2
+done
