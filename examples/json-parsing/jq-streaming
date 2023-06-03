@@ -13,6 +13,7 @@ payload1() {
 payload2() {
     echo "{\"time\": \"$(date +'%T')\","
     echo "\"demo\": 1"
+    echo "}"
 }
 
 plain_emitter() {
@@ -129,7 +130,7 @@ mqtt_demo() {
     }
 
     mqtt-emitter & _pid=$!
-    trap 1 2 3 onexit
+    trap onexit 1 2 3
     mosquitto_sub -h localhost -t "${TOPIC}"
 }
 
