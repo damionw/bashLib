@@ -5,7 +5,7 @@ TOPIC="demo/timer"
 payload1() {
     cat <<< "
         {\"step\":
-        $i} [1,32,3,4]
+        ${1:-99}} [1,32,3,4]
         {1,2,3,4}
     "
 }
@@ -25,7 +25,7 @@ looped_emitter() {
 
     for ((i=0; i < 2; ++i))
     do
-        payload1
+        payload1 $i
         sleep 1
     done
 
@@ -117,8 +117,21 @@ reader3() {
     done
 }
 
+reader4() {
+    local _payload
+
+    while true
+    do
+        _payload="$(stdbuf -i0 -o0 jq -n -r --unbuffered 'try input')"
+        [[ "${_payload}" = "" ]] && break
+        echo "${_payload}"
+        echo -----------------------
+#         echo "${_payload}" | jq --unbuffered -j '(. | tojson) + "\u0000"'
+    done
+}
+
 looped_demo() {
-    looped_emitter | reader3 | receiver
+    looped_emitter | reader4 # | receiver
 }
 
 mqtt_demo() {
@@ -134,4 +147,4 @@ mqtt_demo() {
     mosquitto_sub -h localhost -t "${TOPIC}"
 }
 
-mqtt_demo
+looped_demo
