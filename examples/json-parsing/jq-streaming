@@ -131,20 +131,29 @@ reader4() {
 }
 
 looped_demo() {
-    looped_emitter | reader4 # | receiver
+    looped_emitter | reader3 | receiver
 }
 
 mqtt_demo() {
-    local _pid=nopid
+    local _pid=nopid _row
 
     onexit() {
+        echo "ONEXIT" >&2
         kill "${_pid}"
         wait "${_pid}"
     }
 
+    # FIXME: Still doesn't work for continuous streaming input
+    trap onexit 1 2 3 EXIT
     mqtt-emitter & _pid=$!
-    trap onexit 1 2 3
-    mosquitto_sub -h localhost -t "${TOPIC}"
+    echo EMITTER ${_pid} >&2
+    mosquitto_sub -h localhost -t "${TOPIC}" | while true
+    do
+        read _row || break
+        echo BLOCK "${_row}" >&2
+        echo "${_row}"
+    done | reader3 # | receiver
 }
 
-looped_demo
+mqtt_demo
+# looped_demo
