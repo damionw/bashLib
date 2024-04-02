@@ -11,7 +11,24 @@ export __BASHLIB_VERSIONS__="$(
     sort -nr
 )"
 
-export BASHLIB_VERSION=$(echo "${__BASHLIB_VERSIONS__}" | head -1)
+export BASHLIB_VERSION="$(
+    echo "${__BASHLIB_VERSIONS__}" | {
+        if [ -z "$1" ]
+        then
+            head -1
+        elif grep '^'"$1"'$'
+        then
+            :
+        else
+            echo "No version $1 found" >&2
+        fi
+    }
+)"
+
+if [ -z "${BASHLIB_VERSION}" ]
+then
+    return 102
+fi
 
 lib_path="${local_path}/${package_name}-${BASHLIB_VERSION}"
 
@@ -38,12 +55,7 @@ export BASHLIB_SUBCOMMANDS_PATH="${lib_path}/subcommands"
 . "${lib_path}/functional"
 
 bashlib::version() {
-    if [ -n "$1" ]
-    then
-        export BASHLIB_VERSION="$1"
-    else
-        echo "${BASHLIB_VERSION}"
-    fi
+    echo "${BASHLIB_VERSION}"
 }
 
 bashlib::versions() {

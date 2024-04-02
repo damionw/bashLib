@@ -8,7 +8,12 @@ library_import_file="$(readlink -f "${local_path}/../lib/bashLib")"
 #===================================================================================
 #                          Import tools library
 #===================================================================================
-. "${library_import_file}"
+dosource() {
+    # Do the import here to 'hide' the command line parameters from the library
+    . "${library_import_file}"
+}
+
+dosource
 
 #===================================================================================
 #                              Logging Options
