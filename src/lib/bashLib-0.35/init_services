@@ -13,6 +13,8 @@ export __INIT_SERVICES_SERVICE_EXECUTABLE__=
 export __INIT_SERVICES_SERVICE_DESCRIPTION__=
 export __INIT_SERVICES_SERVICE_PARAMETERS__=
 export __INIT_SERVICES_SERVICE_ENVIRONMENT__=
+export __INIT_SERVICES_SERVICE_USER__=
+export __INIT_SERVICES_SERVICE_GROUP__=
 
 #=======================================================================
 #
@@ -65,6 +67,24 @@ init_services::service_parameters() {
         export __INIT_SERVICES_SERVICE_PARAMETERS__="$@"
     else
         echo "${__INIT_SERVICES_SERVICE_PARAMETERS__}"
+    fi
+}
+
+init_services::service_user() {
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_USER__="$@"
+    else
+        echo "${__INIT_SERVICES_SERVICE_USER__}"
+    fi
+}
+
+init_services::service_group() {
+    if [ -n "${1}" ]
+    then
+        export __INIT_SERVICES_SERVICE_GROUP__="$@"
+    else
+        echo "${__INIT_SERVICES_SERVICE_GROUP__}"
     fi
 }
 
@@ -211,7 +231,9 @@ init_services::stop_service() {
 #=======================================================================
 init_services::service_config_details() {
     local _prefix="init_services::template::"
-    local _service_executable _service_name _service_description _service_parameters _service_environment
+    local _service_executable _service_name _service_description
+    local _service_parameters _service_environment
+    local _service_user _service_group
     local _config_scheme
 
     if ! _service_executable="$(init_services::service_executable)"
@@ -227,6 +249,12 @@ init_services::service_config_details() {
     then
         return $?
     elif ! _service_environment="$(init_services::service_environment)"
+    then
+        return $?
+    elif ! _service_user="$(init_services::service_user)"
+    then
+        return $?
+    elif ! _service_group="$(init_services::service_group)"
     then
         return $?
     elif ! _config_scheme="$(init_services::service_config_scheme)"
@@ -246,16 +274,15 @@ init_services::service_config_details() {
         -D__SERVICE_PARAMETERS__="${_service_parameters}" \
         -D__SERVICE_NAME__="${_service_name}" \
         -D__SERVICE_DESCRIPTION__="${_service_description}" \
-        -D__SERVICE_ENVIRONMENT__="${_service_environment}"
+        -D__SERVICE_ENVIRONMENT__="${_service_environment}" \
+        -D__SERVICE_USER__="${_service_user}" \
+        -D__SERVICE_GROUP__="${_service_group}" \
 }
 
 init_services::service_config_path() {
     local _path
     
-    if ! _path="$(init_services::service_config_folder)/$(init_services::service_config_filename)"
-    then
-        return $?
-    fi
+    _path="$(init_services::service_config_folder)/$(init_services::service_config_filename)" || return $?
     
     echo "${_path}"
 }
@@ -263,10 +290,9 @@ init_services::service_config_path() {
 init_services::service_config_filename() {
     local _service_name
     
-    if ! _service_name="$(init_services::service_name)"
-    then
-        return $?
-    elif [ -z "${_service_name}" ]
+    _service_name="$(init_services::service_name)" || return $?
+
+    if [ -z "${_service_name}" ]
     then
         return $?
     fi
@@ -329,8 +355,8 @@ init_services::template::systemd() {
 
         [Service]
         Type=simple
-        User=1000
-        Group=1000
+        User=__SERVICE_USER__
+        Group=__SERVICE_GROUP__
         Environment=__SERVICE_ENVIRONMENT__
         Nice=10
         ExecStart=__SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
@@ -354,7 +380,7 @@ init_services::template::upstart(){
 
         console log
         respawn
-        setuid 1000
+        setuid __SERVICE_USER__
 
         script
             __SERVICE_ENVIRONMENT__ /usr/bin/nice -n 10 __SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
@@ -535,8 +561,8 @@ init_services::template::testing() {
 
         [Service]
         Type=simple
-        User=1000
-        Group=1000
+        User=__SERVICE_USER__
+        Group=__SERVICE_GROUP__
         Environment=__SERVICE_ENVIRONMENT__
         Nice=10
         ExecStart=__SERVICE_EXECUTABLE__ __SERVICE_PARAMETERS__
