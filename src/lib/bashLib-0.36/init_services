@@ -236,31 +236,16 @@ init_services::service_config_details() {
     local _service_user _service_group
     local _config_scheme
 
-    if ! _service_executable="$(init_services::service_executable)"
-    then
-        return $?
-    elif ! _service_name="$(init_services::service_name)"
-    then
-        return $?
-    elif ! _service_description="$(init_services::service_description)"
-    then
-        return $?
-    elif ! _service_parameters="$(init_services::service_parameters)"
-    then
-        return $?
-    elif ! _service_environment="$(init_services::service_environment)"
-    then
-        return $?
-    elif ! _service_user="$(init_services::service_user)"
-    then
-        return $?
-    elif ! _service_group="$(init_services::service_group)"
-    then
-        return $?
-    elif ! _config_scheme="$(init_services::service_config_scheme)"
-    then
-        return $?
-    elif [ -z "${_config_scheme}" ]
+    _service_executable="$(init_services::service_executable)" || return $?
+    _service_name="$(init_services::service_name)" || return $?
+    _service_description="$(init_services::service_description)" || return $?
+    _service_parameters="$(init_services::service_parameters)" || return $?
+    _service_environment="$(init_services::service_environment)" || return $?
+    _service_user="$(init_services::service_user)" || return $?
+    _service_group="$(init_services::service_group)" || return $?
+    _config_scheme="$(init_services::service_config_scheme)" || return $?
+
+    if [ -z "${_config_scheme}" ]
     then
         return $?
     elif ! (declare -F | awk '{print $NF;}' | grep -q "^${_prefix}${_config_scheme}$")
@@ -276,7 +261,7 @@ init_services::service_config_details() {
         -D__SERVICE_DESCRIPTION__="${_service_description}" \
         -D__SERVICE_ENVIRONMENT__="${_service_environment}" \
         -D__SERVICE_USER__="${_service_user}" \
-        -D__SERVICE_GROUP__="${_service_group}" \
+        -D__SERVICE_GROUP__="${_service_group}"
 }
 
 init_services::service_config_path() {
